@@ -1,0 +1,25 @@
+# Ignore folders
+
+databases/
+
+database/
+
+results/
+
+logs/
+
+fasta-files/
+
+job_ids/
+
+run_scripts/
+
+
+
+# Ignore specific files
+
+out.csv
+
+slurm-10735798.out
+
+
