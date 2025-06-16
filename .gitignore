@@ -192,3 +192,23 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# viral_detection_pipeline folders/files:
+
+databases/
+
+database/
+
+results/
+
+logs/
+
+fasta-files/
+
+job_ids/
+
+out.csv
+
+slurm-10735798.out
+
+

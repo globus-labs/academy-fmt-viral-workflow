@@ -1,0 +1,10 @@
+AvRCv1.Merged_PredictedHosts.csv
+AvRCv1.Merged_Quality.csv
+AvRCv1.Merged_ViralDesc.csv
+AvRCv1.SequenceTable.csv
+AvRCv1.Tools_CheckV.csv
+AvRCv1.Tools_Genomad.plasmid.csv
+AvRCv1.Tools_Genomad.viral.csv
+AvRCv1.Tools_iPHoP.csv
+AvRCv1.Tools_PhaGCN.csv
+AvRCv1.Tools_PhaTyp.csv
