@@ -62,7 +62,7 @@ Make a database directory (titled `AVrC`) and put the fasta file inside that dir
 ---
 
 ## FaSplit
-- https://anaconda.org/bioconda/ucsc-fasplit
+- Anaconda: https://anaconda.org/bioconda/ucsc-fasplit
 
 ### Conda Install
     conda create -n fasplit_env -c bioconda ucsc-fasplit
@@ -74,7 +74,7 @@ Make a database directory (titled `AVrC`) and put the fasta file inside that dir
 ---
 
 ## Blast
-- https://bioconda.github.io/recipes/blast/README.html
+- Bioconda: https://bioconda.github.io/recipes/blast/README.html
 
 ### Conda Install
     conda create --name blast_env -c bioconda blast
