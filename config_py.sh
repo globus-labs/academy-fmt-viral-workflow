@@ -33,10 +33,6 @@ export MAX_DB_SIZE="0.5GB"
 export FASTA_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/query
 export FA_SPLIT_FILE_SIZE=5000000 # in bytes, 5000 in KB
 
-# containers for tools
-export FASPLIT=/contrib/singularity/shared/bhurwitz/ucsc-fasplit:469--h9b8f530_0.sif   '''redownload'''
-export BLAST=/contrib/singularity/shared/bhurwitz/blast:2.16.0--hc155240_2.sif           '''redownload'''
-
 # BLAST parameters
 export BLAST_TYPE=blastn
 export MAX_TARGET_SEQS=1

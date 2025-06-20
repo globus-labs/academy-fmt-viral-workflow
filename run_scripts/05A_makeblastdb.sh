@@ -18,6 +18,11 @@ pwd; hostname; date
 # get the configurations
 source $WORK_DIR/config.sh
 
+# Load conda environment
+CONDA="/groups/bhurwitz/miniconda3"
+source $CONDA/etc/profile.d/conda.sh
+conda activate blast_env
+
 cd "$DB_DIR"
 
 export DB_LIST="db-list"
@@ -26,6 +31,7 @@ find . -type f -name \*.fasta | sed "s/^\.\///" > $DB_LIST
 
 if [[ ! -e "$DB_LIST" ]]; then
     echo Cannot find database list \"$DB_LIST\"
+    conda deactivate
     exit 1
 fi
 
@@ -40,7 +46,8 @@ while read DB; do
     #
     # create blast database for fasta file 
     #
-    apptainer run ${BLAST} makeblastdb -title ${DB_NAME} -out ${DB_NAME} -in ${DB} -dbtype nucl -max_file_sz ${MAX_DB_SIZE} 
+    makeblastdb -title "${DB_NAME}" -out "${DB_NAME}" -in "${DB}" -dbtype nucl -max_file_sz ${MAX_DB_SIZE}
 done < "$DB_LIST"
 
+conda deactivate
 echo Finished `date`

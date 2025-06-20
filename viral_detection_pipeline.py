@@ -273,7 +273,7 @@ def make_blast_db(config):
             # Build and run makeblastdb command via apptainer
 
             cmd = [
-                "apptainer", "run", blast_image,
+                "conda", "run", "-n", "blast_env",
                 "makeblastdb",
                 "-title", db_name,
                 "-out", db_name,
@@ -345,10 +345,13 @@ def run_launch_blast(config):
         # === Split the FASTA file using faSplit ===
 
         print(f"Splitting {file_name} into chunks of size {split_size}")
-        subprocess.run([
-            "apptainer", "run", fasplit_image,
+ 
+        cmd = [
+            "conda", "run", "-n", "fasplit_env",
             "faSplit", "about", file_path, str(split_size), f"{split_dir}/"
-        ], check=True)
+        ]
+
+        subprocess.run(cmd, check=True)
 
         # === List all split files ===
 

@@ -36,6 +36,12 @@ echo Found \"$NUM_FILES\" files in \"$FASTA_DIR\"
 
 if [ $NUM_FILES -gt 0 ]; then
     i=0
+    
+    #load environment 
+    CONDA="/groups/bhurwitz/miniconda3"       
+    source $CONDA/etc/profile.d/conda.sh
+    conda activate fasplit_env          
+    
     while read FILE; do
         let i++
     
@@ -47,8 +53,9 @@ if [ $NUM_FILES -gt 0 ]; then
         export SPLIT_DIR="$OUT_DIR/fa_split"
         init_dir "$OUT_DIR" "$SPLIT_DIR" 
 
+
         # first we need to split up the fasta files to run quickly
-        apptainer run ${FASPLIT} faSplit about "$FILE" "$FA_SPLIT_FILE_SIZE" "$SPLIT_DIR/"
+        faSplit about "$FILE" "$FA_SPLIT_FILE_SIZE" "$SPLIT_DIR/"
 
         # now launch the blast for the split files against all of the blast databases
         cd "$SPLIT_DIR"
@@ -73,6 +80,7 @@ if [ $NUM_FILES -gt 0 ]; then
 
         cd "$FASTA_DIR"
     done < "$FILES_LIST"
+    conda deactivate
 else
     echo No input fasta files.
 fi
