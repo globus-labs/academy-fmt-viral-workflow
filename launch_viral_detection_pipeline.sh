@@ -53,17 +53,16 @@ jid10=$(echo $job10 | sed 's/^Submitted batch job //')
 echo $jid10 >> job_ids
 
 # 05A_makeblastdb.sh - create the blast databases - no dependencies
-#job11=$(sbatch --dependency=afterok:$jid10 $SCRIPTS_DIR/05A_makeblastdb.sh)
-#jid11=$(echo $job11 | sed 's/^Submitted batch job //')
-#echo $jid11
+job11=$(sbatch --dependency=afterok:$jid10 $SCRIPTS_DIR/05A_makeblastdb.sh)
+jid11=$(echo $job11 | sed 's/^Submitted batch job //')
+echo $jid11
 
 # 05B_launchblast.sh - jid12 depends on jid11
 # This script: 
 # 1. splits the query files (into small chunks)
 # 2. runs job 05C_blast.sh to blast each chunk vs the databases
-# 3. runs jub 05D_mergeblast.sh to collate results by input file
-#job12=$(sbatch --dependency=afterok:$jid11 $SCRIPTS_DIR/05B_launchblast.sh)
-job12=$(sbatch --dependency=afterok:$jid10 $SCRIPTS_DIR/05B_launchblast.sh)
+# 3. runs job 05D_mergeblast.sh to collate results by input file
+job12=$(sbatch --dependency=afterok:$jid11 $SCRIPTS_DIR/05B_launchblast.sh)
 jid12=$(echo $job12 | sed 's/^Submitted batch job //')
 echo $jid12
 
