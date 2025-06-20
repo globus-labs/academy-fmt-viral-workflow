@@ -4,9 +4,9 @@ export SCRIPT_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_det
 export LOG_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/logs
 
 # defining input from assembly 
-export XFILE=xaa
-export XFILE_DIR=/xdisk/bhurwitz/virus_hunting/data/all_assemblies
-export SPADES_DIR=/xdisk/bhurwitz/virus_hunting/data/all_assemblies/out_spades
+export XFILE=xac
+export XFILE_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses
+export SPADES_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/out_spades
 
 # variables used for 3 viromics tools as well as checkv 
 #export OUT_VIRSORT=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results/01B_checkv_virsorter

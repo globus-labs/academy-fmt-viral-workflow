@@ -5,12 +5,45 @@ import shutil
 # === Turn config file into a dictionary of variables ===
 
 def make_config(config_path="./config_py.sh"):
+    config = {}
     with open(config_path) as f:
-        config = dict(
-            line.strip().split('=', 1)
-            for line in f if '=' in line and not line.startswith('#')
-        )
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if line.startswith('export '):
+                line = line[len('export '):]  # Remove 'export '
+            if '=' in line:
+                key, val = line.split('=', 1)
+                config[key.strip()] = val.strip().strip('"').strip("'")
     return config
+
+def unzip_fasta(sample_ids, config):
+
+    """
+    Unzips the FASTA files for a list of sample IDs using subprocess.
+    """
+    for sample_id in sample_ids:
+        # Define the gzipped FASTA and the destination paths
+        spades_gz = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz")
+        unzipped_spades = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
+
+        # Check if the gzipped file exists
+        if not os.path.exists(spades_gz):
+            print(f"[WARNING] File not found: {spades_gz}")
+            continue
+
+        # Check if the unzipped file already exists to avoid redundant work
+        if os.path.exists(unzipped_spades):
+            print(f"[INFO] File already unzipped: {unzipped_spades}")
+            continue
+
+        # Unzip the file
+        try:
+            subprocess.run(["gzip", "-d", spades_gz], check=True)
+            print(f"[INFO] Successfully unzipped: {spades_gz}")
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] Failed to unzip {spades_gz}: {e}")
 
 # === GeNomad ===
 
@@ -37,8 +70,6 @@ def run_genomad(sample_ids, config):
             "genomad", "end-to-end", "--cleanup",
             unzipped_spades, output_dir, db
         ]
-
-        print(f"Launching Genomad for {sample_id}: {' '.join(cmd)}")
 
         # Run the command
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -101,15 +132,12 @@ def run_checkv_genomad(sample_ids, config):
         ]
 
         # Run the commands
-        print(f"[CheckV] Running checkv end_to_end for sample {sample_id}")
         proc_checkv = subprocess.Popen(cmd_checkv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         processes.append(("CheckV", sample_id, proc_checkv))
 
-        print(f"[Parser] Running R script parser for sample {sample_id}")
         proc_parser = subprocess.Popen(cmd_parser, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=output_dir)
         processes.append(("Parser", sample_id, proc_parser))
 
-        print(f"[seqtk] Subsetting FASTA for sample {sample_id}")
         proc_seqtk = subprocess.Popen(cmd_seqtk, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=output_dir)
         processes.append(("seqtk", sample_id, proc_seqtk))
 
@@ -334,7 +362,7 @@ def run_launch_blast(config):
 
         out_dir = os.path.join(results_dir, file_name)
         split_dir = os.path.join(out_dir, "fa_split")
-	config["SPLIT_DIR"] = split_dir
+        config["SPLIT_DIR"] = split_dir
 
         # === Reset output directory ===
 
@@ -552,11 +580,13 @@ def main():
     # === Load configuration ===
     config = make_config("./config_py.sh")
 
-    sample_ids_file = f"config['XFILE_DIR']/config['XFILE']"
-
+    sample_ids_file = f"{config['XFILE_DIR']}/{config['XFILE']}"
+    
     # Read sample IDs from the file
     with open(sample_ids_file, "r") as f:
         sample_ids = [line.strip() for line in f if line.strip()]
+    
+    unzip_fasta(sample_ids, config)
 
     # === Run each pipeline step in the correct order ===
 
