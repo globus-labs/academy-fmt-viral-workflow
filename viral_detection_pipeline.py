@@ -21,24 +21,23 @@ def make_config(config_path="./config_py.sh"):
 def unzip_fasta(sample_ids, config):
 
     """
-    Unzips the FASTA files for a list of sample IDs using subprocess.
+    Check and unzip the FASTA files for a list of sample IDs using subprocess.
     """
     for sample_id in sample_ids:
-        # Define the gzipped FASTA and the destination paths
         spades_gz = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz")
         unzipped_spades = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
 
-        # Check if the gzipped file exists
-        if not os.path.exists(spades_gz):
-            print(f"[WARNING] File not found: {spades_gz}")
-            continue
-
-        # Check if the unzipped file already exists to avoid redundant work
+        # Skip if unzipped file already exists
         if os.path.exists(unzipped_spades):
-            print(f"[INFO] File already unzipped: {unzipped_spades}")
+            print(f"[INFO] File already exists: {unzipped_spades}")
             continue
 
-        # Unzip the file
+        # If .gz file doesn't exist, issue a warning
+        if not os.path.exists(spades_gz):
+            print(f"[WARNING] Gzipped file not found, assuming already unzipped: {spades_gz}")
+            continue
+
+        # Attempt to unzip the file
         try:
             subprocess.run(["gzip", "-d", spades_gz], check=True)
             print(f"[INFO] Successfully unzipped: {spades_gz}")
@@ -80,9 +79,9 @@ def run_genomad(sample_ids, config):
         stdout, stderr = proc.communicate()
 
         if proc.returncode == 0:
-            print(f"{sample_id} completed successfully.")
+            print(f"Genomad {sample_id} completed successfully.")
         else:
-            print(f"{sample_id} failed with return code {proc.returncode}.")
+            print(f"Genomad {sample_id} failed with return code {proc.returncode}.")
             print(stderr.decode())
 
     print("All Genomad jobs finished.")
@@ -114,9 +113,8 @@ def run_checkv_genomad(sample_ids, config):
         # === CheckV Command ===
         cmd_checkv = [
             "conda", "run", "-n", "checkv_env",
-            "checkv", "end_to_end", genomad_input, output_dir, "-t", "4"
-        ]
-
+            "checkv", "end_to_end", genomad_input, output_dir, "-t", "4",
+            "-d", config["CHECKVDB"]]
         # === Parse output with R Script ===
         cmd_parser = [
             "conda", "run", "-n", "seqtk_env",
