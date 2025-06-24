@@ -94,15 +94,13 @@ def run_checkv_genomad(sample_ids, config):
     Runs CheckV and post-processing steps for multiple samples using subprocess.Popen for parallel execution.
     """
     processes = []
-
     for sample_id in sample_ids:
         # === Define paths from config ===
         spades_dir = config["SPADES_DIR"]
         out_genomad = config["OUT_GENOMAD"]
         out_checkv = config["OUT_CHECKV_GENOMAD"]
-        rscript_dir = config["RSCRIPT_DIR"]
         checkv_parser = config["CHECKV_PARSER"]
-        parse_length = config["PARSE_LENGTH"]
+        parse_length = str(config["PARSE_LENGTH"])  
         work_dir = config["WORK_DIR"]
         unzipped_spades = f"{spades_dir}/{sample_id}/contigs.fasta"
         genomad_input = f"{out_genomad}/{sample_id}/contigs_summary/contigs_virus.fna"
@@ -110,44 +108,67 @@ def run_checkv_genomad(sample_ids, config):
         parse_input = f"{output_dir}/contamination.tsv"
         selection_csv = f"{output_dir}/selection2_viral.csv"
 
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
         # === CheckV Command ===
         cmd_checkv = [
             "conda", "run", "-n", "checkv_env",
             "checkv", "end_to_end", genomad_input, output_dir, "-t", "4",
-            "-d", config["CHECKVDB"]]
+            "-d", config["CHECKVDB"]
+        ]
+
         # === Parse output with R Script ===
         cmd_parser = [
-            "conda", "run", "-n", "seqtk_env",
-            rscript_dir, checkv_parser,
+            "conda", "run", "-n", "r_env", 
+            "Rscript", checkv_parser,    
             "-i", parse_input,
-            "-l", parse_length
+            "-l", parse_length,
+            "-o", selection_csv            
         ]
 
         # === Subset FASTA with seqtk ===
         cmd_seqtk = [
             "conda", "run", "-n", "seqtk_env",
-            "seqtk", "subseq", unzipped_spades, "selection2_viral.csv"
+            "seqtk", "subseq", unzipped_spades, selection_csv
         ]
 
         # Run the commands
         proc_checkv = subprocess.Popen(cmd_checkv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         processes.append(("CheckV", sample_id, proc_checkv))
 
+        # Wait for CheckV to finish before proceeding
+        stdout, stderr = proc_checkv.communicate() 
+        if proc_checkv.returncode == 0:
+            print(f"[CheckV] {sample_id} completed successfully.")
+        else:
+            print(f"[CheckV] {sample_id} failed.")
+            print(stderr.decode())
+            continue  
+
         proc_parser = subprocess.Popen(cmd_parser, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=output_dir)
         processes.append(("Parser", sample_id, proc_parser))
+
+        # Wait for Parser to finish before proceeding
+        stdout, stderr = proc_parser.communicate()  
+        if proc_parser.returncode == 0:
+            print(f"[Parser] {sample_id} completed successfully.")
+        else:
+            print(f"[Parser] {sample_id} failed.")
+            print(stderr.decode())
+            continue  
 
         proc_seqtk = subprocess.Popen(cmd_seqtk, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=output_dir)
         processes.append(("seqtk", sample_id, proc_seqtk))
 
-    # === Wait for all processes to complete ===
+    # === Wait for seqtk processes to complete ===
     for tool, sample_id, proc in processes:
         stdout, stderr = proc.communicate()
-
         if proc.returncode == 0:
             print(f"[{tool}] {sample_id} completed successfully.")
         else:
             print(f"[{tool}] {sample_id} failed.")
-            print(f"Error for {sample_id} in {tool}: {stderr.decode()}")
+            print(stderr.decode())
 
     # === Return to working directory ===
     os.chdir(work_dir)
@@ -328,7 +349,7 @@ def run_launch_blast(config):
     fasta_dir = config["FASTA_DIR"]
     fasplit_image = config["FASPLIT"]
     split_size = config["FA_SPLIT_FILE_SIZE"]
-    results_dir = f"{work_dir}/results/{prog}"
+    results_dir = f"{work_dir}/results_testing/{prog}"
     files_list_path = f"{fasta_dir}/fasta-files"
 
     # === Reinitialize results directory ===
@@ -430,7 +451,7 @@ def run_blast(config, slurm_array_task_id):
     db_dir = config["DB_DIR"]
     split_files_list = config["SPLIT_FILES_LIST"]
     split_dir = config["SPLIT_DIR"]
-    results_dir = f"{work_dir}/results/05C_blast"
+    results_dir = f"{work_dir}/results_testing/05C_blast"
     blast_type = config["BLAST_TYPE"]
     eval_param = config["EVAL"]
     out_fmt = config["OUT_FMT"]
@@ -489,7 +510,7 @@ def merge_blast(config):
     # === Define paths from config ===
     work_dir = config["WORK_DIR"]
     db_dir = config["DB_DIR"]
-    results_dir = f"{work_dir}/results/05D_mergeblast"
+    results_dir = f"{work_dir}/results_testing/05D_mergeblast"
     db_list_path = f"{db_dir}/db-list"
     file_name = config["FILE_NAME"] 
 

@@ -14,16 +14,16 @@ export CHECKVDB=/xdisk/bhurwitz/databases/checkv-db-v1.5
 #export OUT_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results/02A_dvf
 #export DVF_DB=/groups/bhurwitz/databases/DeepVirFinder
 #export OUT_CHECKV_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results/02B_checkv_dvf
-export OUT_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results/03A_genomad
+export OUT_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03A_genomad
 export GENOMAD_DB=/xdisk/bhurwitz/databases/genomad_db          
-export OUT_CHECKV_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results/03B_checkv_genomad
-export CHECKV_PARSER=/groups/bhurwitz/tools/R_scripts/CheckV_parser.R    '''redownload'''
+export OUT_CHECKV_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03B_checkv_genomad
+export CHECKV_PARSER=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/run_scripts/CheckV_parser.R 
 export PARSE_LENGTH=5000
-export RSCRIPT_DIR=/groups/bhurwitz/miniconda3/bin/Rscript  '''redownload'''
+#export RSCRIPT_DIR=/groups/bhurwitz/miniconda3/bin/Rscript  '''redownload'''
 
 # dereplication and clustering 
-export OUT_DEREP=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results/04A_dereplicate
-export OUT_CLUSTER=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results/04B_cluster
+export OUT_DEREP=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/04A_dereplicate
+export OUT_CLUSTER=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/04B_cluster
 
 # step 1 create blastdb
 export DB_DIR=/xdisk/bhurwitz/databases/AVrC    
@@ -42,6 +42,10 @@ export OUT_FMT=6 # tabular format with no headings
 # Annotation parameters
 export PCTID=85
 export LENGTH=1000
+export BLAST_HITS="/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results_testing/05D_mergeblast/AVrC_allrepresentatives.fasta/clusterRes_rep_seq.fasta.txt"
+export ANNOTATIONS="/xdisk/bhurwitz/databases/AVrC/annotation/database_csv/"
+export OUTPUT="/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results_testing/06_annotate"
+
 
 #
 # Some custom functions for our scripts
