@@ -42,9 +42,9 @@ export OUT_FMT=6 # tabular format with no headings
 # Annotation parameters
 export PCTID=85
 export LENGTH=1000
-export BLAST_HITS="/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results_testing/05D_mergeblast/AVrC_allrepresentatives.fasta/clusterRes_rep_seq.fasta.txt"
-export ANNOTATIONS="/xdisk/bhurwitz/databases/AVrC/annotation/database_csv/"
-export OUTPUT="/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results_testing/06_annotate"
+export BLAST_HITS="/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/05D_mergeblast/AVrC_allrepresentatives.fasta/clusterRes_rep_seq.fasta.txt"
+export ANNOTATIONS="/xdisk/bhurwitz/databases/AVrC/database_csv/"
+export OUTPUT="/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/06_annotate"
 
 
 #

@@ -28,9 +28,13 @@ conda activate checkv_env
 
 checkv end_to_end ${GENOMAD} ${OUT_CHECKV_GENOMAD}/${SAMPLE_ID} -t 4
 conda deactivate
-conda activate seqtk_env
 
 cd ${OUT_CHECKV_GENOMAD}/${SAMPLE_ID}/
-${RSCRIPT_DIR} ${CHECKV_PARSER} -i ${PARSE_INPUT} -l ${PARSE_LENGTH}
+
+conda activate r_env
+Rscript ${CHECKV_PARSER} -i ${PARSE_INPUT} -l ${PARSE_LENGTH} -o selection2_viral.csv
+conda deactivate
+
+conda activate seqtk_env
 seqtk subseq ${UNZIPPED_SPADES} selection2_viral.csv > subset_spades.fasta
 cd ${WORK_DIR}

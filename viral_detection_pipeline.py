@@ -66,7 +66,7 @@ def run_genomad(sample_ids, config):
         # === Genomad command ====
         cmd = [
             "conda", "run", "-n", "genomad_env",
-            "genomad", "end-to-end", "--cleanup",
+            "genomad", "end-to-end", "--cleanup","--restart",
             unzipped_spades, output_dir, db
         ]
 
@@ -135,7 +135,7 @@ def run_checkv_genomad(sample_ids, config):
 
         # Run the commands
         proc_checkv = subprocess.Popen(cmd_checkv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        processes.append(("CheckV", sample_id, proc_checkv))
+        processes.append(("CheckV", sample_id, proc_checkv, None))
 
         # Wait for CheckV to finish before proceeding
         stdout, stderr = proc_checkv.communicate() 
@@ -147,7 +147,7 @@ def run_checkv_genomad(sample_ids, config):
             continue  
 
         proc_parser = subprocess.Popen(cmd_parser, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=output_dir)
-        processes.append(("Parser", sample_id, proc_parser))
+        processes.append(("Parser", sample_id, proc_parser, None))
 
         # Wait for Parser to finish before proceeding
         stdout, stderr = proc_parser.communicate()  
@@ -157,13 +157,18 @@ def run_checkv_genomad(sample_ids, config):
             print(f"[Parser] {sample_id} failed.")
             print(stderr.decode())
             continue  
-
-        proc_seqtk = subprocess.Popen(cmd_seqtk, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=output_dir)
-        processes.append(("seqtk", sample_id, proc_seqtk))
+        
+        output_file_path = os.path.join(output_dir, "subset_spades.fasta")
+        output_file = open(output_file_path, "w")
+        proc_seqtk = subprocess.Popen(cmd_seqtk, stdout=output_file, stderr=subprocess.PIPE, cwd=output_dir)
+        processes.append(("seqtk", sample_id, proc_seqtk, output_file))
 
     # === Wait for seqtk processes to complete ===
-    for tool, sample_id, proc in processes:
+
+    for tool, sample_id, proc, output_file in processes:
         stdout, stderr = proc.communicate()
+        if output_file is not None:        
+            output_file.close()
         if proc.returncode == 0:
             print(f"[{tool}] {sample_id} completed successfully.")
         else:
@@ -197,7 +202,7 @@ def run_dereplicate(sample_ids, config):
         # === Create output directory ===
         os.makedirs(cluster_dir, exist_ok=True)
 
-        # === Run mmseqs easy-cluster for dereplication ===
+        # === Run mmseqs easy-cluster for dereplication ===       
         print(f"[mmseqs] Clustering {subset_spades} for sample {sample_id}")
         cmd_mmseqs = [
             "conda", "run", "-n", "mmseqs2_env",
@@ -207,7 +212,14 @@ def run_dereplicate(sample_ids, config):
         proc_mmseqs = subprocess.Popen(cmd_mmseqs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         processes.append(("mmseqs", sample_id, proc_mmseqs))
 
-        # === Run awk to remove duplicate FASTA headers ===
+        # Wait for mmseqs to finish before proceeding
+        stdout, stderr = proc_mmseqs.communicate()
+        if proc_mmseqs.returncode == 0:
+            print(f"[mmseqs] {sample_id} completed successfully.")
+        else:
+            print(f"[mmseqs] {sample_id} failed.")
+            print(stderr.decode())
+
         print(f"[awk] Removing duplicate headers for {input_fasta} in sample {sample_id}")
         awk_cmd = (
             r"""awk '/^>/{if($0!=prev){print; prev=$0}} !/^>/' """
@@ -217,18 +229,15 @@ def run_dereplicate(sample_ids, config):
         proc_awk = subprocess.Popen(awk_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         processes.append(("awk", sample_id, proc_awk))
 
-    # === Wait for all processes to complete ===
-    for tool, sample_id, proc in processes:
-        stdout, stderr = proc.communicate()
-
-        if proc.returncode == 0:
-            print(f"[{tool}] {sample_id} completed successfully.")
+        # Wait for awk to finish before proceeding
+        stdout, stderr = proc_awk.communicate()
+        if proc_awk.returncode == 0:
+            print(f"[awk] {sample_id} completed successfully.")
         else:
-            print(f"[{tool}] {sample_id} failed.")
-            print(f"Error for {sample_id} in {tool}: {stderr.decode()}")
+            print(f"[awk] {sample_id} failed.")
+            print(stderr.decode())
 
-    print("[Done] Dereplication completed for all samples.")
-
+        print("[Done] Dereplication completed for all samples.")
 
 # === Clustering ===
 
@@ -286,7 +295,6 @@ def make_blast_db(config):
     """
     # === Define paths from config ===
     db_dir = config["DB_DIR"]
-    blast_image = config["BLAST"]
     max_db_size = config["MAX_DB_SIZE"]
     db_list_path = f"{db_dir}/db-list"
 
@@ -347,15 +355,19 @@ def run_launch_blast(config):
     prog = "05B_launchblast"
     work_dir = config["WORK_DIR"]
     fasta_dir = config["FASTA_DIR"]
-    fasplit_image = config["FASPLIT"]
     split_size = config["FA_SPLIT_FILE_SIZE"]
     results_dir = f"{work_dir}/results_testing/{prog}"
     files_list_path = f"{fasta_dir}/fasta-files"
+    query_dir = f"{work_dir}/query"
 
-    # === Reinitialize results directory ===
+    # === Reinitialize results and query directory ===
     if os.path.exists(results_dir):
         shutil.rmtree(results_dir)
     os.makedirs(results_dir)
+    
+    if os.path.exists(query_dir):
+        shutil.rmtree(query_dir)
+    os.makedirs(query_dir)  
 
     # === List all .fasta files in FASTA_DIR ===
     with open(files_list_path, "w") as file_list:
@@ -380,7 +392,7 @@ def run_launch_blast(config):
         print(f"\n[{i}] Processing {file_name}")
 
         out_dir = os.path.join(results_dir, file_name)
-        split_dir = os.path.join(out_dir, "fa_split")
+        split_dir = os.path.join(query_dir, "fa_split")
         config["SPLIT_DIR"] = split_dir
 
         # === Reset output directory ===
@@ -417,17 +429,6 @@ def run_launch_blast(config):
                 f.write(sfile + "\n")
 
         # === Run BLAST on each split file ===
-
-        # Store split list in a shared location for run_blast
-        shared_split_list = os.path.join(work_dir, "split_files_list.txt")
-        shutil.copy(split_files_list_path, shared_split_list)
-
-        # Also set this split_dir as source for query files
-        split_query_dir = os.path.join(work_dir, "split_files")
-        if os.path.exists(split_query_dir):
-            shutil.rmtree(split_query_dir)
-        shutil.copytree(split_dir, split_query_dir)
-
         for task_id in range(num_split):
             print(f"Running BLAST for split {task_id}")
             run_blast(config, task_id)
@@ -456,7 +457,6 @@ def run_blast(config, slurm_array_task_id):
     eval_param = config["EVAL"]
     out_fmt = config["OUT_FMT"]
     max_target_seqs = config["MAX_TARGET_SEQS"]
-    num_threads = config["NUM_THREADS"]
 
     # Read the SPLIT_FILES_LIST to get the split file names
     with open(split_files_list, 'r') as f:
@@ -486,8 +486,8 @@ def run_blast(config, slurm_array_task_id):
 
         # Run BLAST command
         blast_cmd = [
-            "apptainer", "run", config["BLAST"], blast_type,
-            "-num_threads", str(num_threads),
+            "conda", "run", "-n", "blast_env", blast_type,
+            "-num_threads", "48",
             "-db", blast_db,
             "-query", os.path.join(split_dir, split_file),
             "-out", blast_out,
@@ -537,10 +537,9 @@ def merge_blast(config):
         print(f"Merging BLAST results for {db}")
         with open(blast_results, 'w') as outfile:
             for result_file in os.listdir(blast_out):
-                if result_file.endswith(".txt"):  # Ensure you're reading only .txt files
-                    result_path = os.path.join(blast_out, result_file)
-                    with open(result_path, 'r') as infile:
-                        outfile.write(infile.read())
+                result_path = os.path.join(blast_out, result_file)
+                with open(result_path, 'r') as infile:
+                    outfile.write(infile.read())
 
         # Convert to GFF format using Python
         print(f"Converting BLAST results to GFF format for {db}")
@@ -572,6 +571,11 @@ def annotate_blast(config):
     # Ensure output directory exists
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+    
+    # Remove unwanted files
+    for file in os.listdir(annotations_dir):
+        if file == '.DS_Store' or file.startswith('._'):
+            os.remove(os.path.join(annotations_dir, file))
 
     # Debug print of annotation files
     print("Files in annotation directory:")

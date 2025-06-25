@@ -43,7 +43,9 @@ FMT virus detection workflow in Academy -- Naomi Summer 2025 Project
     wget -O /xdisk/bhurwitz/databases/AVrC_allrepresentatives.fasta.gz "https://zenodo.org/records/11426065/files/AVrC_allrepresentatives.fasta.gz?download=1"
     gunzip AVrC_allrepresentatives.fasta.gz
 Make a database directory (titled `AVrC`) and put the fasta file inside that directory.
-
+Download and unzip the csv annotation files as well within teh AVrC directory
+    wget -O database_csv.tar.gz https://zenodo.org/records/11426065/files/database_csv.tar.gz?download=1
+    tar -xvzf database_csv.tar.gz
 ---
 
 ## Mmseqs

@@ -194,21 +194,17 @@ cython_debug/
 .cursorindexingignore
 
 # viral_detection_pipeline folders/files:
-
 databases/
-
 database/
-
 results/
-
 logs/
-
 fasta-files/
-
 job_ids/
-
 out.csv
-
 slurm-10735798.out
-
-
+file_list.txt
+MMseqs2/
+query/
+results_testing/
+split_files/
+split_files_list.txt
