@@ -208,3 +208,4 @@ query/
 results_testing/
 split_files/
 split_files_list.txt
+*.swp
