@@ -341,7 +341,7 @@ def run_launch_blast(split_size, results_dir, files_list_path, query_dir, db_dir
         # === Run BLAST on each split file ===
         for task_id in range(num_split):
             print(f"Running BLAST for split {task_id}")
-            db_list_path = run_blast(db_dir, split_files_list, split_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs)
+            db_list_path = run_blast(task_id, db_dir, split_files_list, split_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs)
 
         # === Merge results to GFF ===
         hits_file = merge_blast(merge_results_dir, db_list_path, file_name)
@@ -353,7 +353,7 @@ def run_launch_blast(split_size, results_dir, files_list_path, query_dir, db_dir
 # === Blast ===
 
 @python_app
-def run_blast(db_dir, split_files_list, split_dir, results_dir, blast_type, eval_param, out_fmt, max_target_seqs):
+def run_blast(task_id, db_dir, split_files_list, split_dir, results_dir, blast_type, eval_param, out_fmt, max_target_seqs):
 
     """
     Runs the BLAST command for each split file against each database.
@@ -364,8 +364,8 @@ def run_blast(db_dir, split_files_list, split_dir, results_dir, blast_type, eval
     with open(split_files_list, 'r') as f:
         split_files = [line.strip() for line in f.readlines()]
 
-    # Select the split file based on the SLURM_ARRAY_TASK_ID
-    split_file = split_files[slurm_array_task_id]
+    # Select the split file based on the task_id
+    split_file = split_files[task_id]
 
     # Create results directory if it doesn't exist
     os.makedirs(results_dir, exist_ok=True)
