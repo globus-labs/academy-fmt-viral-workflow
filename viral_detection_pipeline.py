@@ -54,7 +54,7 @@ def run_genomad(sample_ids, config):
     Args:
         sample_ids (list): List of sample ID strings to process.
         config (dict): Configuration dict with 'SPADES_DIR', 'OUT_GENOMAD', 'GENOMAD_DB'.
-    """
+ """
     processes = []
 
     for sample_id in sample_ids:
@@ -85,6 +85,7 @@ def run_genomad(sample_ids, config):
             print(stderr.decode())
 
     print("All Genomad jobs finished.")
+
 
 # === CheckV on GeNomad ===
 
@@ -365,10 +366,6 @@ def run_launch_blast(config):
         shutil.rmtree(results_dir)
     os.makedirs(results_dir)
     
-    if os.path.exists(query_dir):
-        shutil.rmtree(query_dir)
-    os.makedirs(query_dir)  
-
     # === List all .fasta files in FASTA_DIR ===
     with open(files_list_path, "w") as file_list:
         for root, dirs, files in os.walk(fasta_dir):
