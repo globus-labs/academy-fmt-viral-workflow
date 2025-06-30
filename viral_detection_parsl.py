@@ -5,10 +5,22 @@ import parsl
 from parsl.app.app import python_app, bash_app
 from parsl.configs.local_threads import config
 from parsl.data_provider.files import File
+from parsl.config import Config
+from parsl.executors.threads import ThreadPoolExecutor
+
 
 print(parsl.__version__)
 
-parsl.load(config)
+local_threads = Config(
+    executors=[
+        ThreadPoolExecutor(
+            max_threads=16,
+            label='local_threads'
+        )
+    ]
+)
+
+parsl.load(local_threads)
 
 # === Turn config file into a dictionary of variables ===
 
@@ -175,7 +187,8 @@ def run_cluster_all(out_derep, out_cluster, derep_fasta, cluster_res, tmp_dir, r
     Clusters all dereplicated sequences using mmseqs2 in a conda environment.
     """
     import subprocess
-    import os 
+    import os
+    import shutil 
     # === Combine all dereplicated FASTA files ===
 
     print(f"[combine] Writing all cleaned_clusterRes_all_seqs.fasta files to {derep_fasta}")
@@ -268,86 +281,81 @@ def make_blast_db(db_dir, max_db_size, db_list_path):
 
 # === Launch Blast === 
 
-@python_app
 def run_launch_blast(split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir):
 
     """
     Splits FASTA files, runs BLAST per split file, and merges results using Python functions.
     """
-    import subprocess
-    import os 
     # === Reinitialize results and query directory ===
     if os.path.exists(results_dir):
         shutil.rmtree(results_dir)
     os.makedirs(results_dir)
     
-    # === List all .fasta files in FASTA_DIR ===
-    with open(files_list_path, "w") as file_list:
-        for root, dirs, files in os.walk(query_dir):
-            for file in files:
-                if file.endswith(".fasta"):
-                    full_path = os.path.join(root, file)
-                    file_list.write(os.path.relpath(full_path, query_dir) + "\n")
+    split_dir, file_name = faSplit(query_dir, split_size)
+    # === List all split files ===
+    
+    split_files = sorted([
+        f for f in os.listdir(split_dir) if f.endswith(".fa")
+    ])
+    num_split = len(split_files)
+    print(f"{num_split} split files created")
 
-    with open(files_list_path) as f:
-        fasta_files = [line.strip() for line in f.readlines()]
+    # === Save list of split files for BLAST step ===
 
-    if not fasta_files:
-        print("No FASTA files found.")
-        return
+    split_files_list = os.path.join(split_dir, "split_files_list.txt")
+    with open(split_files_list, "w") as f:
+        for sfile in split_files:
+            f.write(sfile + "\n")
 
-    print(f"Found {len(fasta_files)} FASTA files.")
+    # === Run BLAST on each split file ===
+    for task_id in range(num_split):
+        print(f"Running BLAST for split {task_id}")
+        db_list_path = run_blast(task_id, db_dir, split_files_list, split_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs)
 
-    for i, file_rel in enumerate(fasta_files, 1):
-        file_path = os.path.join(query_dir, file_rel)
-        file_name = os.path.basename(file_path)
-        print(f"\n[{i}] Processing {file_name}")
-
-        out_dir = os.path.join(results_dir, file_name)
-        split_dir = os.path.join(query_dir, "fa_split")
-
-        # === Reset output directory ===
-
-        if os.path.exists(out_dir):
-            shutil.rmtree(out_dir)
-        os.makedirs(split_dir)
-
-        # === Split the FASTA file using faSplit ===
-
-        print(f"Splitting {file_name} into chunks of size {split_size}")
- 
-        cmd = [
-            "conda", "run", "-n", "fasplit_env",
-            "faSplit", "about", file_path, str(split_size), f"{split_dir}/"
-        ]
-
-        subprocess.run(cmd, check=True)
-
-        # === List all split files ===
-
-        split_files = sorted([
-            f for f in os.listdir(split_dir) if f.endswith(".fa")
-        ])
-        num_split = len(split_files)
-        print(f"{num_split} split files created")
-
-        # === Save list of split files for BLAST step ===
-
-        split_files_list = os.path.join(split_dir, "split_files_list.txt")
-        with open(split_files_list, "w") as f:
-            for sfile in split_files:
-                f.write(sfile + "\n")
-
-        # === Run BLAST on each split file ===
-        for task_id in range(num_split):
-            print(f"Running BLAST for split {task_id}")
-            db_list_path = run_blast(task_id, db_dir, split_files_list, split_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs)
-
-        # === Merge results to GFF ===
-        hits_file = merge_blast(merge_results_dir, db_list_path, file_name)
+    # === Merge results to GFF ===
+    hits_file = merge_blast(merge_results_dir, db_list_path, file_name)
 
     print("\n All BLAST jobs completed.")
     return hits_file
+
+# === faSplit ===
+
+@python_app
+def faSplit(query_dir, split_size):
+
+    import subprocess
+    import os
+    import shutil
+
+    for root, dirs, files in os.walk(query_dir):
+        for file in files:
+            if file.endswith(".fasta"):
+                fasta_file = os.path.join(root, file)
+                break
+        if fasta_file:
+            break
+
+    if not fasta_file: 
+        print("No FASTA file found.")
+        return
+
+    file_name = os.path.basename(fasta_file) 
+    print(f"\nProcessing {file_name}")
+
+    # === Initialize directories ===
+    split_dir = os.path.join(query_dir, "fa_split")
+    if os.path.exists(split_dir):
+        shutil.rmtree(split_dir)
+    os.makedirs(split_dir)
+
+    # === Split the FASTA file using faSplit ===
+    print(f"Splitting {file_name} into chunks of size {split_size}")
+    cmd = [
+        "conda", "run", "-n", "fasplit_env",
+        "faSplit", "about", fasta_file, str(split_size), f"{split_dir}/"
+    ]
+    subprocess.run(cmd, check=True)
+    return split_dir, file_name
 
 
 # === Blast ===
@@ -494,6 +502,8 @@ def annotate_blast(hits_file, annotations_dir, output_dir, script_path, pctid, l
             print("Running:", " ".join(cmd))
             subprocess.run(cmd, check=True)
 
+    final = "Pipeline Complete."
+    return final
 
 def main():
     # === Load configuration ===
@@ -579,7 +589,7 @@ d, "contigs.fasta")
     pctid = config['PCTID']
     length = config['LENGTH']
     # === Annotate ===
-    annotate_blast(hits_file, annotations_dir, out_annotate, script_path, pctid, length)
+    print(annotate_blast(hits_file, annotations_dir, out_annotate, script_path, pctid, length).result())
 
 
 if __name__ == "__main__":
