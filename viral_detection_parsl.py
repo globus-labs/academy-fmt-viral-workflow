@@ -24,7 +24,6 @@ parsl.load(local_threads)
 
 # === Turn config file into a dictionary of variables ===
 
-@python_app
 def make_config(config_file):
     config = {}
     with open(config_file, "r") as f:
@@ -39,7 +38,6 @@ def make_config(config_file):
                 config[key.strip()] = val.strip().strip('"').strip("'")
     return config
 
-@python_app
 def read_sample_ids(sample_ids_file):
     # Read sample IDs from the file
     with open(sample_ids_file, "r") as f:
@@ -55,7 +53,6 @@ def unzip_fasta(spades_gz, unzipped_spades_path):
     """
     import subprocess
     import os
-    from parsl.data_provider.files import File
 
     # Skip if unzipped file already exists
     if os.path.exists(unzipped_spades_path):
@@ -69,7 +66,7 @@ def unzip_fasta(spades_gz, unzipped_spades_path):
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Failed to unzip {spades_gz}: {e}")
 
-    unzipped_spades = File(unzipped_spades_path)
+    unzipped_spades = unzipped_spades_path
     return unzipped_spades
 
 # === GeNomad ===
@@ -337,7 +334,7 @@ def faSplit(query_dir, split_size):
 
     if not fasta_file: 
         print("No FASTA file found.")
-        return
+        return None, None
 
     file_name = os.path.basename(fasta_file) 
     print(f"\nProcessing {file_name}")
@@ -511,14 +508,14 @@ def main():
     config_file = File(config_path)
     config = make_config(config_file)
 
+    sample_ids_file = File(f"{config['XFILE_DIR']}/{config['XFILE']}")
     sample_ids_file = File(os.path.join(config['XFILE_DIR'], config['XFILE']))
     sample_ids = read_sample_ids(sample_ids_file)
     
     for sample_id in sample_ids:
         # === Define variables for unzipping ===
         spades_gz = File(os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz"))
-        unzipped_spades_path = os.path.join(config['SPADES_DIR'], sample_i
-d, "contigs.fasta")
+        unzipped_spades_path = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
         # === Unzip ===
         unzipped_spades = unzip_fasta(spades_gz, unzipped_spades_path)
 
