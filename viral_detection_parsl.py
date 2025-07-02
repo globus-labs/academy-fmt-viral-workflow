@@ -2,7 +2,7 @@ import os
 import subprocess
 import shutil
 import parsl
-from parsl.app.app import python_app, bash_app
+from parsl.app.app import python_app, bash_app, join_app
 from parsl.configs.local_threads import config
 from parsl.data_provider.files import File
 from parsl.config import Config
@@ -56,8 +56,9 @@ def unzip_fasta(spades_gz, unzipped_spades_path):
 
     # Skip if unzipped file already exists
     if os.path.exists(unzipped_spades_path):
-        print(f"[INFO] File already exists: {unzipped_spades}")
-        return
+        print(f"[INFO] File already exists: {unzipped_spades_path}")
+        unzipped_spades = unzipped_spades_path
+        return unzipped_spades
 
     # Attempt to unzip the file
     try:
@@ -77,6 +78,13 @@ def run_genomad(unzipped_spades,genomad_output_dir,db):
  """
     import subprocess
     import os
+    
+    if not unzipped_spades or not os.path.exists(unzipped_spades):
+        raise ValueError(f"Invalid input file: {unzipped_spades}")
+    if not genomad_output_dir:
+        raise ValueError(f"Invalid output directory: {genomad_output_dir}")
+    if not db or not os.path.exists(db):
+        raise ValueError(f"Invalid database path: {db}")
 
     # === Genomad command ====
     cmd = [
@@ -286,9 +294,10 @@ def run_launch_blast(split_size, results_dir, files_list_path, query_dir, db_dir
     # === Reinitialize results and query directory ===
     if os.path.exists(results_dir):
         shutil.rmtree(results_dir)
-    os.makedirs(results_dir)
+        os.makedirs(results_dir)
     
-    split_dir, file_name = faSplit(query_dir, split_size)
+    fa_split_future = faSplit(query_dir, split_size)
+    split_dir, file_name = fa_split_future.result()
     # === List all split files ===
     
     split_files = sorted([
@@ -352,6 +361,7 @@ def faSplit(query_dir, split_size):
         "faSplit", "about", fasta_file, str(split_size), f"{split_dir}/"
     ]
     subprocess.run(cmd, check=True)
+   
     return split_dir, file_name
 
 
