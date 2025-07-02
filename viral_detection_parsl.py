@@ -138,19 +138,22 @@ def run_checkv_genomad(checkv_parser, parse_length, work_dir, unzipped_spades, g
     # Run the commands
     subprocess.run(cmd_checkv, check=True)
     subprocess.run(cmd_parser, check=True)
-    subprocess.run(cmd_seqtk, check=True)
+
+    subset_spades = os.path.join(checkv_output_dir, "subset_spades.fasta")
+
+    with open(subset_spades, "w") as out_f:
+        subprocess.run(cmd_seqtk, check=True, stdout=out_f)    
 
     # === Return to working directory ===
     os.chdir(work_dir)
     print(f"[Done] Returned to working directory: {work_dir}")
-    
-    subset_spades = os.path.join(checkv_output_dir, "subset_spades.fasta")
+
     return subset_spades
 
 # === Dereplication ===
 
 @python_app
-def run_dereplicate(subset_spades, cluster_res, tmp_dir, input_fasta, cleaned_fasta, out_derep):
+def run_dereplicate(sample_id, cluster_dir, subset_spades, cluster_res, tmp_dir, input_fasta, cleaned_fasta, out_derep):
 
     """
     Runs mmseqs2 dereplication and awk processing for multiple samples in parallel using subprocess.Popen.
@@ -178,7 +181,7 @@ def run_dereplicate(subset_spades, cluster_res, tmp_dir, input_fasta, cleaned_fa
         f" > {cleaned_fasta}"
     )
 
-    subprocess.run(cmd_awk, check=True)
+    subprocess.run(cmd_awk, shell=True, check=True)
 
     derep_fasta = os.path.join(out_derep, "dereplicated.fasta")
     return derep_fasta 
@@ -284,9 +287,11 @@ def make_blast_db(db_dir, max_db_size, db_list_path):
     result = subprocess.run(["date"], capture_output=True, text=True)
     print(f"Finished {result.stdout.strip()}")
 
+    return db_name 
+
 # === Launch Blast === 
 
-def run_launch_blast(split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir):
+def run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir):
 
     """
     Splits FASTA files, runs BLAST per split file, and merges results using Python functions.
@@ -316,10 +321,10 @@ def run_launch_blast(split_size, results_dir, files_list_path, query_dir, db_dir
     # === Run BLAST on each split file ===
     for task_id in range(num_split):
         print(f"Running BLAST for split {task_id}")
-        db_list_path = run_blast(task_id, db_dir, split_files_list, split_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs)
+        db_list_path = run_blast(db_name, task_id, db_dir, split_files_list, split_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs)
 
     # === Merge results to GFF ===
-    hits_file = merge_blast(merge_results_dir, db_list_path, file_name)
+    hits_file = merge_blast(work_dir, merge_results_dir, db_list_path, file_name)
 
     print("\n All BLAST jobs completed.")
     return hits_file
@@ -368,7 +373,7 @@ def faSplit(query_dir, split_size):
 # === Blast ===
 
 @python_app
-def run_blast(task_id, db_dir, split_files_list, split_dir, results_dir, blast_type, eval_param, out_fmt, max_target_seqs):
+def run_blast(db_name, task_id, db_dir, split_files_list, split_dir, results_dir, blast_type, eval_param, out_fmt, max_target_seqs):
 
     """
     Runs the BLAST command for each split file against each database.
@@ -421,7 +426,7 @@ def run_blast(task_id, db_dir, split_files_list, split_dir, results_dir, blast_t
 # === Merge Blast ===
 
 @python_app
-def merge_blast(results_dir, db_list_path, file_name):
+def merge_blast(work_dir, results_dir, db_list_path, file_name):
 
     """
     Merges BLAST results and converts them to GFF format.
@@ -429,7 +434,7 @@ def merge_blast(results_dir, db_list_path, file_name):
     import subprocess
     import os 
     # Create the results directory (remove prior runs and create new)
-    os.makedirs(merge_results_dir, exist_ok=True)
+    os.makedirs(results_dir, exist_ok=True)
 
     # === Read the db-list and process each database ===
     with open(db_list_path, 'r') as f:
@@ -465,7 +470,7 @@ def merge_blast(results_dir, db_list_path, file_name):
                     outfile.write(gff_line)
         
     print("Finished processing BLAST results.")
-    hits_file = os.path.join(results_dir, "AVrC_allrepresentativesfasta", "clusterRes_rep_seq.fasta.txt")
+    hits_file = os.path.join(results_dir, "AVrC_allrepresentatives.fasta", "clusterRes_rep_seq.fasta.txt")
     return hits_file
 
 # === Annotation ===
@@ -547,13 +552,14 @@ def main():
         subset_spades = run_checkv_genomad(checkv_parser, parse_length, work_dir, unzipped_spades, genomad_virus, checkv_output_dir, parse_input, selection_csv,checkvdb)
 
         # === Define variables for Dereplication ===
+        cluster_dir = os.path.join(config["OUT_DEREP"], sample_id)
         cluster_res = os.path.join(config["OUT_DEREP"], sample_id, "clusterRes")
         tmp_dir = os.path.join(config["OUT_DEREP"], sample_id, "tmp")
         input_fasta = f"{cluster_res}_all_seqs.fasta"
         cleaned_fasta = os.path.join(config["OUT_DEREP"], sample_id, "cleaned_clusterRes_all_seqs.fasta")
         out_derep = config["OUT_DEREP"]
         # === Dereplicate ===
-        derep_fasta = run_dereplicate(subset_spades, cluster_res, tmp_dir, input_fasta, cleaned_fasta, out_derep)
+        derep_fasta = run_dereplicate(sample_id, cluster_dir, subset_spades, cluster_res, tmp_dir, input_fasta, cleaned_fasta, out_derep)
 
     # === Define variables for clustering ===
     out_cluster = config["OUT_CLUSTER"]
@@ -570,7 +576,7 @@ def main():
     max_db_size = config["MAX_DB_SIZE"]
     db_list_path = os.path.join(db_dir, "db-list")
     # Make BLASTDB
-    make_blast_db(db_dir, max_db_size, db_list_path)
+    db_name = make_blast_db(db_dir, max_db_size, db_list_path)
 
     # === Define BLAST variables ===
     prog = "05B_launchblast"
@@ -587,7 +593,7 @@ def main():
          # MERGE BLAST 
     merge_results_dir = os.path.join(work_dir, "results_testing", "05D_mergeblast")
     # === Launch BLAST ===
-    hits_file = run_launch_blast(split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
+    hits_file = run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
 
     # === Define variables for annotation ===
     annotations_dir = config['ANNOTATIONS']
@@ -596,7 +602,8 @@ def main():
     pctid = config['PCTID']
     length = config['LENGTH']
     # === Annotate ===
-    print(annotate_blast(hits_file, annotations_dir, out_annotate, script_path, pctid, length).result())
+    annotate_blast_future = annotate_blast(hits_file, annotations_dir, out_annotate, script_path, pctid, length)
+    print(annotate_blast_future.result())
 
 
 if __name__ == "__main__":
