@@ -10,7 +10,7 @@ from parsl.executors.threads import ThreadPoolExecutor
 
 
 print(parsl.__version__)
-
+'''
 local_threads = Config(
     executors=[
         ThreadPoolExecutor(
@@ -19,8 +19,45 @@ local_threads = Config(
         )
     ]
 )
+'''
 
-parsl.load(local_threads)
+from parsl.config import Config
+from parsl.executors import HighThroughputExecutor
+from parsl.launchers import SrunLauncher
+from parsl.providers import SlurmProvider
+from parsl.usage_tracking.levels import LEVEL_1
+from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_interface
+
+
+HTEX = Config(
+     executors=[
+          HighThroughputExecutor(
+               label="Parsl_htex",
+               address=address_by_interface('eth0'), 
+               worker_debug=False,
+               cores_per_worker=1.0,
+               max_workers_per_node=16,
+               provider=SlurmProvider(
+                    partition='standard',
+                    account='bhurwitz',
+                    init_blocks=1,
+                    mem_per_node=80,
+                    cores_per_node=16,
+                    nodes_per_block=1,
+                    scheduler_options='',
+                    cmd_timeout=60,
+                    walltime='24:00:00',
+                    launcher=SrunLauncher(),
+                    worker_init='',
+               ),
+          )
+     ],
+     usage_tracking=LEVEL_1,
+)
+
+
+parsl.load(HTEX)
 
 # === Turn config file into a dictionary of variables ===
 
@@ -43,6 +80,20 @@ def read_sample_ids(sample_ids_file):
     with open(sample_ids_file, "r") as f:
         sample_ids = [line.strip() for line in f if line.strip()]
     return sample_ids
+
+
+@python_app
+def wait_for_all_done_flags(out_derep, sample_ids):
+    import time
+    import os
+    done_flags = [os.path.join(out_derep, f"done_{sid}.flag") for sid in sample_ids]
+    while True:
+        done_count = sum(os.path.exists(flag) for flag in done_flags)
+        if done_count == len(done_flags):
+            break
+        time.sleep(5)
+    print("[wait_for_all_done_flags] All dereplication samples done.")
+    return True
 
 
 @python_app
@@ -82,8 +133,6 @@ def run_genomad(unzipped_spades,genomad_output_dir,db):
     if not unzipped_spades or not os.path.exists(unzipped_spades):
         raise ValueError(f"Invalid input file: {unzipped_spades}")
     if not genomad_output_dir:
-        raise ValueError(f"Invalid output directory: {genomad_output_dir}")
-    if not db or not os.path.exists(db):
         raise ValueError(f"Invalid database path: {db}")
 
     # === Genomad command ====
@@ -183,13 +232,17 @@ def run_dereplicate(sample_id, cluster_dir, subset_spades, cluster_res, tmp_dir,
 
     subprocess.run(cmd_awk, shell=True, check=True)
 
+    done_flag = os.path.join(out_derep, f"done_{sample_id}.flag")
+    with open(done_flag, "w") as f:
+        f.write("done\n")
+
     derep_fasta = os.path.join(out_derep, "dereplicated.fasta")
     return derep_fasta 
    
 # === Clustering ===
 
 @python_app
-def run_cluster_all(out_derep, out_cluster, derep_fasta, cluster_res, tmp_dir, rep_seq_src, rep_seq_dst):
+def run_cluster_all(wait_future, out_derep, out_cluster, derep_fasta, cluster_res, tmp_dir, rep_seq_src, rep_seq_dst):
 
     """
     Clusters all dereplicated sequences using mmseqs2 in a conda environment.
@@ -553,14 +606,17 @@ def main():
 
         # === Define variables for Dereplication ===
         cluster_dir = os.path.join(config["OUT_DEREP"], sample_id)
-        cluster_res = os.path.join(config["OUT_DEREP"], sample_id, "clusterRes")
+        cluster_res_derep = os.path.join(config["OUT_DEREP"], sample_id, "clusterRes")
         tmp_dir = os.path.join(config["OUT_DEREP"], sample_id, "tmp")
-        input_fasta = f"{cluster_res}_all_seqs.fasta"
+        input_fasta = f"{cluster_res_derep}_all_seqs.fasta"
         cleaned_fasta = os.path.join(config["OUT_DEREP"], sample_id, "cleaned_clusterRes_all_seqs.fasta")
         out_derep = config["OUT_DEREP"]
         # === Dereplicate ===
-        derep_fasta = run_dereplicate(sample_id, cluster_dir, subset_spades, cluster_res, tmp_dir, input_fasta, cleaned_fasta, out_derep)
-
+        derep_fasta = run_dereplicate(sample_id, cluster_dir, subset_spades, cluster_res_derep, tmp_dir, input_fasta, cleaned_fasta, out_derep)
+   
+    # === Wait for Dereplication to Complete ===
+    wait_future = wait_for_all_done_flags(out_derep, sample_ids)
+ 
     # === Define variables for clustering ===
     out_cluster = config["OUT_CLUSTER"]
     work_dir = config["WORK_DIR"]
@@ -569,7 +625,7 @@ def main():
     rep_seq_src = os.path.join(out_cluster, "clusterRes_rep_seq.fasta")
     rep_seq_dst = os.path.join(work_dir, "query")
     # === Cluster ===
-    query_dir = run_cluster_all(out_derep, out_cluster, derep_fasta, cluster_res, tmp_dir, rep_seq_src, rep_seq_dst)
+    query_dir = run_cluster_all(wait_future, out_derep, out_cluster, derep_fasta, cluster_res, tmp_dir, rep_seq_src, rep_seq_dst)
 
     # === Define variables to Make BLASTDB ===
     db_dir = config["DB_DIR"]
@@ -593,6 +649,8 @@ def main():
          # MERGE BLAST 
     merge_results_dir = os.path.join(work_dir, "results_testing", "05D_mergeblast")
     # === Launch BLAST ===
+    hits_file = run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
+
     hits_file = run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
 
     # === Define variables for annotation ===

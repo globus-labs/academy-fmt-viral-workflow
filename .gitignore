@@ -209,3 +209,8 @@ results_testing/
 split_files/
 split_files_list.txt
 *.swp
+.nfs*
+genomad_ERR2198611.err
+genomad_ERR2198611.out
+*.out
+runinfo/
