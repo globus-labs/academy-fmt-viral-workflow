@@ -14,11 +14,11 @@
 #
 
 pwd; hostname; date
-source $WORK_DIR/config.sh
+source $WORK_DIR/config_py.sh
 
 # set up the results, stderr and stdout directories for this script
 PROG="05D_mergeblast"
-RESULTS_DIR="$WORK_DIR/results/$PROG"
+RESULTS_DIR="$WORK_DIR/results_testing/$PROG"
 
 # initialize directories, this will remove prior runs and create new directories
 create_dir "$RESULTS_DIR"
@@ -32,7 +32,7 @@ while read DB; do
     BLAST_RESULTS="$RESULTS_BY_DB/${FILE_NAME}.txt"
     BLAST_GFF="$RESULTS_BY_DB/${FILE_NAME}.gff"
 
-    BLAST_OUT="$PWD/results/05C_blast/$DB/$FILE_NAME"
+    BLAST_OUT="$PWD/results_testing/05C_blast/$DB/$FILE_NAME"
 
     cat $BLAST_OUT/* > $BLAST_RESULTS
 

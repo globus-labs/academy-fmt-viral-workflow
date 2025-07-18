@@ -9,13 +9,13 @@
 #SBATCH --mem-per-cpu=5000
 
 pwd; hostname; date
-source ./config.sh
+source ./config_py.sh
 
 CLUSTER_RES=${OUT_CLUSTER}/clusterRes
 TMP=${OUT_CLUSTER}/tmp
 
 #load environment
-CONDA="/groups/bhurwitz/miniconda3"
+CONDA="/xdisk/bhurwitz/miniconda3"
 source $CONDA/etc/profile.d/conda.sh
 conda activate mmseqs2_env
 

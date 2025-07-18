@@ -34,16 +34,16 @@ HTEX = Config(
      executors=[
           HighThroughputExecutor(
                label="Parsl_htex",
-               address=address_by_interface('eth0'), 
+               #address=address_by_interface('eth0'), 
                worker_debug=False,
                cores_per_worker=1.0,
-               max_workers_per_node=16,
+               max_workers_per_node=74,
                provider=SlurmProvider(
                     partition='standard',
                     account='bhurwitz',
                     init_blocks=1,
                     mem_per_node=80,
-                    cores_per_node=16,
+                    cores_per_node=74,
                     nodes_per_block=1,
                     scheduler_options='',
                     cmd_timeout=60,
@@ -649,8 +649,6 @@ def main():
          # MERGE BLAST 
     merge_results_dir = os.path.join(work_dir, "results_testing", "05D_mergeblast")
     # === Launch BLAST ===
-    hits_file = run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
-
     hits_file = run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
 
     # === Define variables for annotation ===

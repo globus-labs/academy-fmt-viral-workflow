@@ -7,10 +7,10 @@
 #SBATCH --time=20:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=20G
-#SBATCH --array=0-52
+#SBATCH --array=0-2
 
 pwd; hostname; date
-source ./config.sh
+source ./config_py.sh
 
 names=($(cat $XFILE_DIR/$XFILE))
 SAMPLE_ID=${names[${SLURM_ARRAY_TASK_ID}]}
@@ -22,7 +22,7 @@ GENOMAD=${OUT_GENOMAD}/${SAMPLE_ID}/contigs_summary/contigs_virus.fna
 PARSE_INPUT=${OUT_CHECKV_GENOMAD}/${SAMPLE_ID}/contamination.tsv
 
 #load environment
-CONDA="/groups/bhurwitz/miniconda3"
+CONDA="/xdisk/bhurwitz/miniconda3"
 source $CONDA/etc/profile.d/conda.sh
 conda activate checkv_env
 

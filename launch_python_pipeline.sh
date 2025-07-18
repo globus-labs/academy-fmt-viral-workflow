@@ -10,4 +10,4 @@
 #SBATCH --mem-per-cpu=5000
 
 
-python viral_detection_pipeline.py
+./run_logged_job.sh viral_detection_pipeline.py

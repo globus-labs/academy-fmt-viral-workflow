@@ -396,6 +396,9 @@ def run_launch_blast(config):
 
         if os.path.exists(out_dir):
             shutil.rmtree(out_dir)
+        
+        if os.path.exists(split_dir):
+            shutil.rmtree(split_dir)
         os.makedirs(split_dir)
 
         # === Split the FASTA file using faSplit ===

@@ -50,7 +50,7 @@ export OUTPUT="/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detect
 #
 # Some custom functions for our scripts
 #
-''' --------------------------------------------------
+# --------------------------------------------------
 function init_dir {
     for dir in $*; do
         if [ -d "$dir" ]; then
@@ -74,4 +74,4 @@ function create_dir {
 # --------------------------------------------------
 function lc() {
     wc -l $1 | cut -d ' ' -f 1
-}'''
+}

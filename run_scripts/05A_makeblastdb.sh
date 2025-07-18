@@ -16,10 +16,11 @@
 pwd; hostname; date
 
 # get the configurations
-source $WORK_DIR/config.sh
+source ./config_py.sh
+
 
 # Load conda environment
-CONDA="/groups/bhurwitz/miniconda3"
+CONDA="/xdisk/bhurwitz/miniconda3"
 source $CONDA/etc/profile.d/conda.sh
 conda activate blast_env
 

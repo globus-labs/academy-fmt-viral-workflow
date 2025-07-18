@@ -15,11 +15,11 @@
 #
 
 pwd; hostname; date
-source ./config.sh
+source ./config_py.sh
 
 # set up the results, stderr and stdout directories for this script
 PROG="05B_launchblast"
-RESULTS_DIR="$WORK_DIR/results/$PROG"
+RESULTS_DIR="$WORK_DIR/results_testing/$PROG"
 
 # initialize directories, this will remove prior runs and create new directories
 init_dir "$RESULTS_DIR"
@@ -38,7 +38,7 @@ if [ $NUM_FILES -gt 0 ]; then
     i=0
     
     #load environment 
-    CONDA="/groups/bhurwitz/miniconda3"       
+    CONDA="/xdisk/bhurwitz/miniconda3"       
     source $CONDA/etc/profile.d/conda.sh
     conda activate fasplit_env          
     
