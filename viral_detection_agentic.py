@@ -61,10 +61,19 @@ def unzip_fasta(spades_gz, unzipped_spades_path):
 
 import asyncio
 import subprocess
-
+'''
 async def run_subprocess(cmd, **kwargs):
     return await asyncio.to_thread(subprocess.run, cmd, check=True, **kwargs)
-
+'''                       
+async def run_subprocess(cmd, **kwargs):
+    try:
+        return await asyncio.to_thread(subprocess.run, cmd, check=True, **kwargs)
+    except subprocess.CalledProcessError as e:
+        print("Command failed:", e.cmd)
+        print("Return code:", e.returncode)
+        print("Output:", e.output)
+        print("Stderr:", e.stderr)
+       
 
 # === GeNomad Agent ===
 
@@ -82,7 +91,7 @@ class GeNomadAgent(Agent):
 
         cmd = [
             "conda", "run", "-n", "genomad_env",
-            "genomad", "end-to-end", "--cleanup", "--restart",
+            "genomad", "end-to-end", "--cleanup", "--restart", 
             unzipped_spades, genomad_output_dir, db
         ]
         await run_subprocess(cmd)
@@ -466,71 +475,98 @@ def annotate_blast(hits_file, annotations_dir, output_dir, script_path, pctid, l
     final = "Pipeline Complete."
     return final
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from academy.manager import Manager
+from academy.exchange.local import LocalExchangeFactory
+
+# Helper for per-sample pipeline
+async def process_sample(sample_id, config, genomad_handle, checkv_handle, cluster_handle, first_sample_id):
+    # === Unzip ===
+    spades_gz = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz")
+    unzipped_spades_path = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
+    unzipped_spades = unzip_fasta(spades_gz, unzipped_spades_path)
+
+    # === GeNomad ===
+    genomad_output_dir = os.path.join(config['OUT_GENOMAD'], sample_id)
+    db = config["GENOMAD_DB"]
+    genomad_virus = await(await genomad_handle.run_genomad(unzipped_spades, genomad_output_dir, db))
+
+    # === CheckV ===
+    checkv_parser = config["CHECKV_PARSER"]
+    parse_length = str(config["PARSE_LENGTH"])
+    work_dir = config["WORK_DIR"]
+    checkv_output_dir = os.path.join(config["OUT_CHECKV_GENOMAD"], sample_id)
+    parse_input = os.path.join(checkv_output_dir, "contamination.tsv")
+    selection_csv = os.path.join(checkv_output_dir, "selection2_viral.csv")
+    checkvdb = config["CHECKVDB"]
+    subset_spades = await(await checkv_handle.run_checkv(
+        checkv_parser, parse_length, work_dir, unzipped_spades, genomad_virus,
+        checkv_output_dir, parse_input, selection_csv, checkvdb))
+
+    # === Dereplication ===
+    cluster_dir = os.path.join(config["OUT_DEREP"], sample_id)
+    cluster_res_derep = os.path.join(cluster_dir, "clusterRes")
+    tmp_dir_derep = os.path.join(cluster_dir, "tmp")
+    input_fasta = f"{cluster_res_derep}_all_seqs.fasta"
+    cleaned_fasta = os.path.join(cluster_dir, "cleaned_clusterRes_all_seqs.fasta")
+    out_derep = config["OUT_DEREP"]
+    derep_fasta = await(await cluster_handle.run_dereplicate(
+        sample_id, subset_spades, cluster_dir, cluster_res_derep,
+        tmp_dir_derep, input_fasta, cleaned_fasta, out_derep))
+
+    # === Only return derep_fasta from the first sample ===
+    if sample_id == first_sample_id:
+        return derep_fasta
+    else:
+        return None
+
+# === Main function ===
 async def main():
     async with await Manager.from_exchange_factory(
         factory=LocalExchangeFactory(),
         executors=ThreadPoolExecutor()
     ) as manager:
-
-        # launch or register your agents here
         genomad_handle = await manager.launch(GeNomadAgent())
         checkv_handle = await manager.launch(CheckVAgent())
         cluster_handle = await manager.launch(DereplicationClusteringAgent())
         blast_handle = await manager.launch(BLASTAgent())
-   
+
         # === Load configuration ===
         config_path = os.path.join(os.getcwd(), "config_py.sh")
         config = make_config(config_path)
-
         sample_ids_file = os.path.join(config['XFILE_DIR'], config['XFILE'])
         sample_ids = read_sample_ids(sample_ids_file)
 
-        for sample_id in sample_ids:
-            # Define variables for unzipping ===
-            spades_gz = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz")
-            unzipped_spades_path = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
-            # === Unzip === 
-            unzipped_spades = unzip_fasta(spades_gz, unzipped_spades_path)
-        
-            # === Define variables for GeNomad ===
-            genomad_output_dir = os.path.join(config['OUT_GENOMAD'], sample_id)
-            db = config["GENOMAD_DB"]
-            # === Run GeNomad ===
-            genomad_virus = await genomad_handle.run_genomad(unzipped_spades, genomad_output_dir, db) 
-            print("genomad_virus type: ", type(genomad_virus))
-             
-            # === Define variables for CheckV ===
-            checkv_parser = config["CHECKV_PARSER"] 
-            parse_length = str(config["PARSE_LENGTH"])
-            work_dir = config["WORK_DIR"]
-            checkv_output_dir = os.path.join(config["OUT_CHECKV_GENOMAD"], sample_id)
-            parse_input = os.path.join(checkv_output_dir, "contamination.tsv")
-            selection_csv = os.path.join(checkv_output_dir, "selection2_viral.csv")
-            checkvdb = config["CHECKVDB"]
-            # === Run CheckV ===
-            subset_spades = await checkv_handle.run_checkv(checkv_parser, parse_length, work_dir, unzipped_spades, genomad_virus, checkv_output_dir, parse_input, selection_csv, checkvdb)
-             
-            # === Define variables for Dereplication ===
-            cluster_dir = os.path.join(config["OUT_DEREP"], sample_id)
-            cluster_res_derep = os.path.join(config["OUT_DEREP"], sample_id, "clusterRes")
-            tmp_dir_derep = os.path.join(config["OUT_DEREP"], sample_id, "tmp")
-            input_fasta = f"{cluster_res_derep}_all_seqs.fasta"
-            cleaned_fasta = os.path.join(config["OUT_DEREP"], sample_id, "cleaned_clusterRes_all_seqs.fasta")
-            out_derep = config["OUT_DEREP"]
-            # === Run Dereplication ===
-            derep_fasta = await cluster_handle.run_dereplicate(sample_id, subset_spades, cluster_dir, cluster_res_derep, tmp_dir_derep, input_fasta, cleaned_fasta, out_derep) 
-     
-        # === Define variables for clustering ===
+        # === Run all samples in parallel ===
+        first_sample_id = sample_ids[0]  # Choose one sample to return the derep_fasta
+
+        per_sample_tasks = [
+            asyncio.create_task(process_sample(sid, config, genomad_handle, checkv_handle, cluster_handle, first_sample_id))
+            for sid in sample_ids
+        ]
+
+        results = await asyncio.gather(*per_sample_tasks)
+
+        # Only one of them should return a non-None derep_fasta
+        derep_fasta = next((r for r in results if r is not None), None)
+
+        if derep_fasta is None:
+            raise ValueError("Dereplicated FASTA not found from any sample.")
+
+        # === Cluster ===
         out_cluster = config["OUT_CLUSTER"]
         work_dir = config["WORK_DIR"]
         cluster_res_cluster = os.path.join(out_cluster, "clusterRes")
         tmp_dir_cluster = os.path.join(out_cluster, "tmp")
         rep_seq_src = os.path.join(out_cluster, "clusterRes_rep_seq.fasta")
         rep_seq_dst = os.path.join(work_dir, "query")
-        # === Cluster ===
-        query_dir = await cluster_handle.run_cluster(sample_ids, out_derep, derep_fasta, out_cluster, cluster_res_cluster, tmp_dir_cluster, rep_seq_src, rep_seq_dst) 
- 
-        # === Define BLAST variables ===
+        out_derep = config["OUT_DEREP"]
+        query_dir = await(await cluster_handle.run_cluster(
+            sample_ids, out_derep, derep_fasta, out_cluster,
+            cluster_res_cluster, tmp_dir_cluster, rep_seq_src, rep_seq_dst))
+
+        # === BLAST ===
         db_dir = config["DB_DIR"]
         max_db_size = config["MAX_DB_SIZE"]
         db_list_path = os.path.join(db_dir, "db-list")
@@ -545,18 +581,21 @@ async def main():
         out_fmt = config["OUT_FMT"]
         max_target_seqs = config["MAX_TARGET_SEQS"]
         merge_results_dir = os.path.join(work_dir, "results_testing", "05D_mergeblast")
-        # === Run BLAST ===
-        hits_file = await blast_handle.run_full_blast(work_dir, split_size, results_dir, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir, max_db_size, db_list_path)
- 
-        # === Define variables for annotation ===
+        hits_file = await(await blast_handle.run_full_blast(
+            work_dir, split_size, results_dir, query_dir, db_dir,
+            blast_results_dir, blast_type, eval_param, out_fmt,
+            max_target_seqs, merge_results_dir, max_db_size, db_list_path))
+
+        # === Annotation ===
         annotations_dir = config['ANNOTATIONS']
         out_annotate = config['OUTPUT']
         script_path = os.path.join(config['SCRIPT_DIR'], "solution1_manual.py")
         pctid = config['PCTID']
         length = config['LENGTH']
-        # === Run Annotation ===
         final = annotate_blast(hits_file, annotations_dir, out_annotate, script_path, pctid, length)
-        print(final) 
+        print(final)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
