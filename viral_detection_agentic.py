@@ -179,37 +179,59 @@ async def run_subprocess(cmd, **kwargs):
 # === Viral Detection Agent ===
 
 @python_app
-def virsorter_app(unzipped_spades, output_dir):
+def virsorter_app(unzipped_spades, virsorter_output_dir):
     import subprocess
     import os
     cmd = [
-        "conda", "run", "-n", "virsorter_env",
-        "virsorter", "run", "-w", output_dir,
-        "-i", unzipped_spades, "--min-length", "1000", "--keep-original-seq"
+        "conda", "run", "-n", "virsorter2_env",
+        "virsorter", "run", "-w", virsorter_output_dir,
+        "-i", unzipped_spades, "--min-length", "1500", "-j", "4", "all"
     ]
     subprocess.run(cmd, check=True)
-    return os.path.join(output_dir, "final-viral-combined.fa")
+    return os.path.join(virsorter_output_dir, "final-viral-combined.fa")
 
 @python_app
-def deepvirfinder_app(unzipped_spades, output_dir):
+def deepvirfinder_app(unzipped_spades, dvf_output_dir, dvf_db, work_dir, script_dir):
     import subprocess
     import os
+    os.chdir(dvf_db)
+
     cmd = [
         "conda", "run", "-n", "dvf_env",
-        "python", "/path/to/deepvirfinder/predict.py",
-        "-i", unzipped_spades, "-o", output_dir, "-l", "1000"
+        "python", "dvf.py",
+        "-i", unzipped_spades,
+        "-o", dvf_output_dir,
+        "-l", "1500"
     ]
     subprocess.run(cmd, check=True)
-    return os.path.join(output_dir, "pred.tsv")
+
+    os.chdir(work_dir)
+
+    dvf_output = os.path.join(dvf_output_dir, "contigs.fasta_gt1500bp_dvfpred.txt")
+    dvf_fasta_output = os.path.join(dvf_output_dir, "dvf.fasta")
+
+    os.chdir(script_dir)
+
+    cmd2 = [
+        "conda", "run", "-n", "dvf_env",
+        "python", "id_from_fasta.py",
+        "-c", unzipped_spades,
+        "-d", dvf_output,
+        "-o", dvf_fasta_output
+    ]
+    subprocess.run(cmd2, check=True)
+
+    os.chdir(work_dir)
+    return dvf_fasta_output
 
 @python_app
-def genomad_app(unzipped_spades, output_dir, db):
+def genomad_app(unzipped_spades, genomad_output_dir, db):
     import subprocess
     import os
     cmd = [
         "conda", "run", "-n", "genomad_env",
         "genomad", "end-to-end", "--cleanup", 
-        unzipped_spades, output_dir, db
+        unzipped_spades, genomad_output_dir, db
     ]
     subprocess.run(cmd, check=True)
     return os.path.join(output_dir, "contigs_summary", "contigs_virus.fna")
@@ -227,37 +249,39 @@ class ViralDetectionAgent(Agent):
         return result
 
     @action
-    async def run_genomad(self, unzipped_spades: str, output_dir: str, db: str) -> str:
-        future = genomad_app(unzipped_spades, output_dir, db)
+    async def run_genomad(self, unzipped_spades: str, genomad_output_dir: str, db: str) -> str:
+        future = genomad_app(unzipped_spades, genomad_output_dir, db)
         return await asyncio.to_thread(future.result)
 
     @action
-    async def run_virsorter(self, unzipped_spades: str, output_dir: str) -> str:
-        future = virsorter_app(unzipped_spades, output_dir)
+    async def run_virsorter(self, unzipped_spades: str, virsorter_output_dir: str) -> str:
+        future = virsorter_app(unzipped_spades, virsorter_output_dir)
         return await asyncio.to_thread(future.result)
 
     @action
-    async def run_deepvirfinder(self, unzipped_spades: str, output_dir: str) -> str:
-        future = deepvirfinder_app(unzipped_spades, output_dir)
+    async def run_deepvirfinder(self, unzipped_spades: str, dvf_output_dir: str) -> str:
+        future = deepvirfinder_app(unzipped_spades, dvf_output_dir)
         return await asyncio.to_thread(future.result)
 
     @action
-    async def run_tool(self, unzipped_spades: str, output_dir: str, db: str) -> str:
+    async def run_tool(self, unzipped_spades: str, genomad_output_dir: str, db: str, 
+                       virsorter_output_dir: str, dvf_output_dir: str, dvf_db: str, 
+                       work_dir: str, script_dir: str) -> str:
         tool = random.choice(["genomad", "virsorter", "deepvirfinder"])
         print(f"[INFO] Selected tool: {tool}")
 
         if tool == "genomad":
-            return await self.run_genomad(unzipped_spades, output_dir, db)
+            result = await self.run_genomad(unzipped_spades, genomad_output_dir, db)
         elif tool == "virsorter":
-            return await self.run_virsorter(unzipped_spades, output_dir)
+            result =  await self.run_virsorter(unzipped_spades, virsorter_output_dir)
         else:
-            return await self.run_deepvirfinder(unzipped_spades, output_dir)
-
+            result = await self.run_deepvirfinder(unzipped_spades, dvf_output_dir, dvf_db, work_dir, script_dir)
+    return result
 
 # Parsl Python app for CheckV
 @python_app
 def checkv_app(checkv_parser, parse_length, work_dir,
-               unzipped_spades, genomad_virus, checkv_output_dir,
+               unzipped_spades, viral_result, checkv_output_dir,
                parse_input, selection_csv, checkvdb):
     import os
     import subprocess
@@ -266,7 +290,7 @@ def checkv_app(checkv_parser, parse_length, work_dir,
 
     cmd_checkv = [
         "conda", "run", "-n", "checkv_env", "checkv", "end_to_end",
-        genomad_virus, checkv_output_dir, "-t", "4", "-d", checkvdb
+        viral_result, checkv_output_dir, "-t", "4", "-d", checkvdb
     ]
     cmd_parser = [
         "conda", "run", "-n", "r_env", "Rscript", checkv_parser,
@@ -297,14 +321,14 @@ class CheckVAgent(Agent):
     @action
     async def run_checkv(
         self, checkv_parser: str, parse_length: str, work_dir: str,
-        unzipped_spades: str, genomad_virus: str, checkv_output_dir: str,
+        unzipped_spades: str, viral_result: str, checkv_output_dir: str,
         parse_input: str, selection_csv: str, checkvdb: str
     ) -> str:
 
         # Run the Parsl app
         future = checkv_app(
             checkv_parser, parse_length, work_dir,
-            unzipped_spades, genomad_virus, checkv_output_dir,
+            unzipped_spades, viral_result, checkv_output_dir,
             parse_input, selection_csv, checkvdb
         )
 
@@ -652,7 +676,13 @@ async def process_sample(sample_id, config, viral_handle, checkv_handle, cluster
     # === GeNomad ===
     genomad_output_dir = os.path.join(config['OUT_GENOMAD'], sample_id)
     db = config["GENOMAD_DB"]
-    genomad_virus = await(await viral_handle.run_tool(unzipped_spades, genomad_output_dir, db))
+    virsorter_output_dir = os.path.join(config["OUT_VIRSORT"], sample_id)
+    dvf_output_dir = os.path.join(config["OUT_DVF"], sample_id)
+    dvf_db = config["DVF_DB"]
+    work_dir = config["WORK_DIR"]
+    script_dir = config["SCRIPT_DIR"]
+    viral_result = await(await viral_handle.run_tool(unzipped_spades, genomad_output_dir, db, virsorter_output_dir, 
+                                                      dvf_output_dir, dvf_db, work_dir, script_dir))
 
     # === CheckV ===
     checkv_parser = config["CHECKV_PARSER"]
@@ -663,7 +693,7 @@ async def process_sample(sample_id, config, viral_handle, checkv_handle, cluster
     selection_csv = os.path.join(checkv_output_dir, "selection2_viral.csv")
     checkvdb = config["CHECKVDB"]
     subset_spades = await(await checkv_handle.run_checkv(
-        checkv_parser, parse_length, work_dir, unzipped_spades, genomad_virus,
+        checkv_parser, parse_length, work_dir, unzipped_spades, viral_result,
         checkv_output_dir, parse_input, selection_csv, checkvdb))
 
     # === Dereplication ===
