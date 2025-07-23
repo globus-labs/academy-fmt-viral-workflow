@@ -18,6 +18,38 @@ FMT virus detection workflow in Academy -- Naomi Summer 2025 Project
 
 ---
 
+## Virsorter2
+- Github: https://github.com/jiarong/VirSorter2
+
+### Conda Install
+    conda create -n virsorter2_env -c conda-forge -c bioconda virsorter=2
+
+### Testing
+    conda activate virsorter2_env
+    virsorter --help
+
+### Database
+    virsorter setup -d db -j 4
+
+---
+
+## DeepVirFinder
+- Github: https://github.com/jessieren/DeepVirFinder
+
+### Conda Install
+    conda create --name dvf_env python=3.6 numpy theano=1.0.3 keras=2.2.4 scikit-learn Biopython h5py=2.10.0 mkl-service=2.4.0
+
+### Testing
+    cd DeepVirFinder
+    conda activate dvf_env
+    python dvf.py --help
+
+### Database
+    git clone https://github.com/jessieren/DeepVirFinder
+    cd DeepVirFinder
+
+---
+
 ## CheckV
 - Bitbucket: https://bitbucket.org/berkeleylab/checkv/src/master/README.md#markdown-header-installation
 - Database portal: https://portal.nersc.gov/CheckV/

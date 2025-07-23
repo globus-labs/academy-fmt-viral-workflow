@@ -215,3 +215,4 @@ genomad_ERR2198611.out
 *.out
 runinfo/
 db-list
+db/

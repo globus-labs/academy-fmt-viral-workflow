@@ -6,9 +6,122 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from academy.manager import Manager
 from academy.exchange.local import LocalExchangeFactory
+import time
+import parsl
+import asyncio
+from parsl import python_app
+from academy.agent import Agent, action
+from parsl.config import Config
+from parsl.executors import HighThroughputExecutor
+from parsl.launchers import SrunLauncher
+from parsl.providers import SlurmProvider
+from parsl.usage_tracking.levels import LEVEL_1
+import random
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from academy.manager import Manager
+from academy.exchange.local import LocalExchangeFactory
 
 
+viral_config = Config(
+     executors=[
+          HighThroughputExecutor(
+               label="Parsl_htex",
+               worker_debug=False,
+               cores_per_worker=1.0,
+               max_workers_per_node=94,
+               provider=SlurmProvider(
+                    partition='standard',
+                    account='bhurwitz',
+                    init_blocks=1,
+                    mem_per_node=80,
+                    cores_per_node=94,
+                    nodes_per_block=1,
+                    scheduler_options='',
+                    cmd_timeout=60,
+                    walltime='24:00:00',
+                    launcher=SrunLauncher(),
+                    worker_init='',
+               ),
+          )
+     ],
+     usage_tracking=LEVEL_1,
+)
 
+checkv_config = Config(
+     executors=[
+          HighThroughputExecutor(
+               label="Parsl_htex",
+               worker_debug=False,
+               cores_per_worker=1.0,
+               max_workers_per_node=94,
+               provider=SlurmProvider(
+                    partition='standard',
+                    account='bhurwitz',
+                    init_blocks=1,
+                    mem_per_node=80,
+                    cores_per_node=94,
+                    nodes_per_block=1,
+                    scheduler_options='',
+                    cmd_timeout=60,
+                    walltime='24:00:00',
+                    launcher=SrunLauncher(),
+                    worker_init='',
+               ),
+          )
+     ],
+     usage_tracking=LEVEL_1,
+)
+
+derep_cluster_config = Config(
+     executors=[
+          HighThroughputExecutor(
+               label="Parsl_htex",
+               worker_debug=False,
+               cores_per_worker=1.0,
+               max_workers_per_node=94,
+               provider=SlurmProvider(
+                    partition='standard',
+                    account='bhurwitz',
+                    init_blocks=1,
+                    mem_per_node=80,
+                    cores_per_node=94,
+                    nodes_per_block=1,
+                    scheduler_options='',
+                    cmd_timeout=60,
+                    walltime='24:00:00',
+                    launcher=SrunLauncher(),
+                    worker_init='',
+               ),
+          )
+     ],
+     usage_tracking=LEVEL_1,
+)
+
+blast_config = Config(
+     executors=[
+          HighThroughputExecutor(
+               label="Parsl_htex",
+               worker_debug=False,
+               cores_per_worker=1.0,
+               max_workers_per_node=94,
+               provider=SlurmProvider(
+                    partition='standard',
+                    account='bhurwitz',
+                    init_blocks=1,
+                    mem_per_node=80,
+                    cores_per_node=94,
+                    nodes_per_block=1,
+                    scheduler_options='',
+                    cmd_timeout=60,
+                    walltime='24:00:00',
+                    launcher=SrunLauncher(),
+                    worker_init='',
+               ),
+          )
+     ],
+     usage_tracking=LEVEL_1,
+)
 
 # === Turn config file into a dictionary of variables ===
 
@@ -33,38 +146,26 @@ def read_sample_ids(sample_ids_file):
     return sample_ids
 
 
-def unzip_fasta(spades_gz, unzipped_spades_path):
-
-    """
-    Check and unzip the FASTA files for a list of sample IDs using subprocess.
-    """
+@python_app
+def unzip_fasta_app(spades_gz, unzipped_spades_path):
     import subprocess
     import os
 
-    # Skip if unzipped file already exists
     if os.path.exists(unzipped_spades_path):
         print(f"[INFO] File already exists: {unzipped_spades_path}")
-        unzipped_spades = unzipped_spades_path
-        return unzipped_spades
+        return unzipped_spades_path
 
-    # Attempt to unzip the file
     try:
-        subprocess.run(["gzip", "-d", spades_gz], check=True)
+        subprocess.run(["gzip", "-dk", spades_gz], check=True)
         print(f"[INFO] Successfully unzipped: {spades_gz}")
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Failed to unzip {spades_gz}: {e}")
+        raise e
 
-    unzipped_spades = unzipped_spades_path
-    return unzipped_spades
+    return unzipped_spades_path
 
 # === Subprocess Wrapper ===
 
-import asyncio
-import subprocess
-'''
-async def run_subprocess(cmd, **kwargs):
-    return await asyncio.to_thread(subprocess.run, cmd, check=True, **kwargs)
-'''                       
 async def run_subprocess(cmd, **kwargs):
     try:
         return await asyncio.to_thread(subprocess.run, cmd, check=True, **kwargs)
@@ -75,253 +176,384 @@ async def run_subprocess(cmd, **kwargs):
         print("Stderr:", e.stderr)
        
 
-# === GeNomad Agent ===
+# === Viral Detection Agent ===
 
-from academy.agent import Agent, action
-import os
-import subprocess
+@python_app
+def virsorter_app(unzipped_spades, output_dir):
+    import subprocess
+    import os
+    cmd = [
+        "conda", "run", "-n", "virsorter_env",
+        "virsorter", "run", "-w", output_dir,
+        "-i", unzipped_spades, "--min-length", "1000", "--keep-original-seq"
+    ]
+    subprocess.run(cmd, check=True)
+    return os.path.join(output_dir, "final-viral-combined.fa")
 
-class GeNomadAgent(Agent):
+@python_app
+def deepvirfinder_app(unzipped_spades, output_dir):
+    import subprocess
+    import os
+    cmd = [
+        "conda", "run", "-n", "dvf_env",
+        "python", "/path/to/deepvirfinder/predict.py",
+        "-i", unzipped_spades, "-o", output_dir, "-l", "1000"
+    ]
+    subprocess.run(cmd, check=True)
+    return os.path.join(output_dir, "pred.tsv")
+
+@python_app
+def genomad_app(unzipped_spades, output_dir, db):
+    import subprocess
+    import os
+    cmd = [
+        "conda", "run", "-n", "genomad_env",
+        "genomad", "end-to-end", "--cleanup", 
+        unzipped_spades, output_dir, db
+    ]
+    subprocess.run(cmd, check=True)
+    return os.path.join(output_dir, "contigs_summary", "contigs_virus.fna")
+
+class ViralDetectionAgent(Agent):
+    def __init__(self):
+        # Load config once on creation
+        parsl.clear()
+        parsl.load(viral_config)
+
     @action
-    async def run_genomad(self, unzipped_spades: str, genomad_output_dir: str, db: str) -> str:
-        if not unzipped_spades or not os.path.exists(unzipped_spades):
-            raise ValueError(f"Invalid input file: {unzipped_spades}")
-        if not genomad_output_dir:
-            raise ValueError(f"Invalid database path: {db}")
+    async def unzip_fasta(self, spades_gz: str, unzipped_spades_path: str) -> str:
+        future = unzip_fasta_app(spades_gz, unzipped_spades_path)
+        result = await asyncio.to_thread(future.result)
+        return result
 
-        cmd = [
-            "conda", "run", "-n", "genomad_env",
-            "genomad", "end-to-end", "--cleanup", "--restart", 
-            unzipped_spades, genomad_output_dir, db
-        ]
-        await run_subprocess(cmd)
-        genomad_virus =  os.path.join(genomad_output_dir, "contigs_summary", "contigs_virus.fna")
-        return genomad_virus
+    @action
+    async def run_genomad(self, unzipped_spades: str, output_dir: str, db: str) -> str:
+        future = genomad_app(unzipped_spades, output_dir, db)
+        return await asyncio.to_thread(future.result)
 
-# === CheckV Agent ===
+    @action
+    async def run_virsorter(self, unzipped_spades: str, output_dir: str) -> str:
+        future = virsorter_app(unzipped_spades, output_dir)
+        return await asyncio.to_thread(future.result)
 
-import subprocess
-import os
+    @action
+    async def run_deepvirfinder(self, unzipped_spades: str, output_dir: str) -> str:
+        future = deepvirfinder_app(unzipped_spades, output_dir)
+        return await asyncio.to_thread(future.result)
 
+    @action
+    async def run_tool(self, unzipped_spades: str, output_dir: str, db: str) -> str:
+        tool = random.choice(["genomad", "virsorter", "deepvirfinder"])
+        print(f"[INFO] Selected tool: {tool}")
+
+        if tool == "genomad":
+            return await self.run_genomad(unzipped_spades, output_dir, db)
+        elif tool == "virsorter":
+            return await self.run_virsorter(unzipped_spades, output_dir)
+        else:
+            return await self.run_deepvirfinder(unzipped_spades, output_dir)
+
+
+# Parsl Python app for CheckV
+@python_app
+def checkv_app(checkv_parser, parse_length, work_dir,
+               unzipped_spades, genomad_virus, checkv_output_dir,
+               parse_input, selection_csv, checkvdb):
+    import os
+    import subprocess
+
+    os.makedirs(checkv_output_dir, exist_ok=True)
+
+    cmd_checkv = [
+        "conda", "run", "-n", "checkv_env", "checkv", "end_to_end",
+        genomad_virus, checkv_output_dir, "-t", "4", "-d", checkvdb
+    ]
+    cmd_parser = [
+        "conda", "run", "-n", "r_env", "Rscript", checkv_parser,
+        "-i", parse_input, "-l", parse_length, "-o", selection_csv
+    ]
+    cmd_seqtk = [
+        "conda", "run", "-n", "seqtk_env", "seqtk", "subseq",
+        unzipped_spades, selection_csv
+    ]
+
+    subprocess.run(cmd_checkv, check=True)
+    subprocess.run(cmd_parser, check=True)
+
+    subset_spades = os.path.join(checkv_output_dir, "subset_spades.fasta")
+    with open(subset_spades, "w") as out_f:
+        subprocess.run(cmd_seqtk, check=True, stdout=out_f)
+
+    os.chdir(work_dir)
+    return subset_spades
+
+# Agent class using the app
 class CheckVAgent(Agent):
+    def __init__(self):
+        # Load config once on creation
+        parsl.clear()
+        parsl.load(checkv_config)  
+        
     @action
     async def run_checkv(
         self, checkv_parser: str, parse_length: str, work_dir: str,
         unzipped_spades: str, genomad_virus: str, checkv_output_dir: str,
         parse_input: str, selection_csv: str, checkvdb: str
     ) -> str:
-        os.makedirs(checkv_output_dir, exist_ok=True)
 
-        cmd_checkv = [
-            "conda", "run", "-n", "checkv_env", "checkv", "end_to_end",
-            genomad_virus, checkv_output_dir, "-t", "4", "-d", checkvdb
-        ]
-        cmd_parser = [
-            "conda", "run", "-n", "r_env", "Rscript", checkv_parser,
-            "-i", parse_input, "-l", parse_length, "-o", selection_csv
-        ]
-        cmd_seqtk = [
-            "conda", "run", "-n", "seqtk_env", "seqtk", "subseq",
-            unzipped_spades, selection_csv
-        ]
+        # Run the Parsl app
+        future = checkv_app(
+            checkv_parser, parse_length, work_dir,
+            unzipped_spades, genomad_virus, checkv_output_dir,
+            parse_input, selection_csv, checkvdb
+        )
 
-        await run_subprocess(cmd_checkv)
-        await run_subprocess(cmd_parser)
+        # Await the result asynchronously
+        result = await asyncio.to_thread(future.result)
 
-        subset_spades = os.path.join(checkv_output_dir, "subset_spades.fasta")
-        with open(subset_spades, "w") as out_f:
-            await run_subprocess(cmd_seqtk, stdout=out_f)
-        os.chdir(work_dir)
-        return subset_spades
+        return result
 
 # === Dereplication/Clustering Agent ===
 
-import os
-import shutil
-import time
-from academy.agent import Agent, action
+# === Parsl Apps ===
+
+@python_app
+def dereplicate_app(
+    sample_id, subset_spades, cluster_dir, cluster_res_derep,
+    tmp_dir_derep, input_fasta, cleaned_fasta, out_derep
+):
+    import os
+    import subprocess
+
+    os.makedirs(cluster_dir, exist_ok=True)
+
+    cmd_mmseqs_derep = [
+        "conda", "run", "-n", "mmseqs2_env",
+        "mmseqs", "easy-cluster", subset_spades, cluster_res_derep, tmp_dir_derep,
+        "--min-seq-id", "0.99", "-c", "0.90", "--cov-mode", "1"
+    ]
+    subprocess.run(cmd_mmseqs_derep, check=True)
+
+    cmd_awk = (
+        r"""awk '/^>/{if($0!=prev){print; prev=$0}} !/^>/' """
+        + input_fasta + f" > {cleaned_fasta}"
+    )
+    subprocess.run(cmd_awk, shell=True, check=True)
+
+    os.makedirs(out_derep, exist_ok=True)
+    done_flag = os.path.join(out_derep, f"done_{sample_id}.flag")
+    with open(done_flag, "w") as f:
+        f.write("done\n")
+
+    return os.path.join(out_derep, "dereplicated.fasta")
+
+
+@python_app
+def cluster_app(
+    sample_ids, out_derep, derep_fasta, out_cluster,
+    cluster_res_cluster, tmp_dir_cluster, rep_seq_src, rep_seq_dst
+):
+    import os
+    import shutil
+    import time
+    import subprocess
+
+    done_flags = [os.path.join(out_derep, f"done_{sid}.flag") for sid in sample_ids]
+    while not all(os.path.exists(flag) for flag in done_flags):
+        time.sleep(5)
+
+    with open(derep_fasta, 'w') as outfile:
+        for root, _, files in os.walk(out_derep):
+            for file in files:
+                if file.endswith("cleaned_clusterRes_all_seqs.fasta"):
+                    with open(os.path.join(root, file)) as infile:
+                        shutil.copyfileobj(infile, outfile)
+
+    os.makedirs(out_cluster, exist_ok=True)
+    cmd_mmseqs_cluster = [
+        "conda", "run", "-n", "mmseqs2_env",
+        "mmseqs", "easy-cluster", derep_fasta, cluster_res_cluster,
+        tmp_dir_cluster, "--min-seq-id", "0.95", "-c", "0.75", "--cov-mode", "1"
+    ]
+    subprocess.run(cmd_mmseqs_cluster, check=True)
+
+    os.makedirs(rep_seq_dst, exist_ok=True)
+    shutil.copy(rep_seq_src, os.path.join(rep_seq_dst, "clusterRes_rep_seq.fasta"))
+    return rep_seq_dst
+
+# === Agent ===
 
 class DereplicationClusteringAgent(Agent):
+    def __init__(self):
+        # Load config once on creation
+        parsl.clear()
+        parsl.load(derep_cluster_config)
 
     @action
     async def run_dereplicate(
         self, sample_id: str, subset_spades: str, cluster_dir: str,
         cluster_res_derep: str, tmp_dir_derep: str, input_fasta: str,
-        cleaned_fasta: str, out_derep: str) -> str:
-        os.makedirs(cluster_dir, exist_ok=True)
+        cleaned_fasta: str, out_derep: str
+    ) -> str:
 
-        # Run dereplication
-        cmd_mmseqs_derep = [
-            "conda", "run", "-n", "mmseqs2_env",
-            "mmseqs", "easy-cluster", subset_spades, cluster_res_derep, tmp_dir_derep,
-            "--min-seq-id", "0.99", "-c", "0.90", "--cov-mode", "1"
-        ]
-        await run_subprocess(cmd_mmseqs_derep)
-
-        # Clean headers with awk
-        cmd_awk = (
-            r"""awk '/^>/{if($0!=prev){print; prev=$0}} !/^>/' """
-            + input_fasta + f" > {cleaned_fasta}"
+        future = dereplicate_app(
+            sample_id, subset_spades, cluster_dir,
+            cluster_res_derep, tmp_dir_derep,
+            input_fasta, cleaned_fasta, out_derep
         )
-        await run_subprocess(cmd_awk, shell=True)
-
-        # Touch done flag
-        done_flag = os.path.join(out_derep, f"done_{sample_id}.flag")
-        with open(done_flag, "w") as f:
-            f.write("done\n")
-        derep_fasta = os.path.join(out_derep, "dereplicated.fasta")
-        return derep_fasta
+        result = await asyncio.to_thread(future.result)
+        return result
 
     @action
     async def run_cluster(
         self, sample_ids: list[str], out_derep: str, derep_fasta: str,
         out_cluster: str, cluster_res_cluster: str, tmp_dir_cluster: str,
-        rep_seq_src: str, rep_seq_dst: str) -> str:
-        # Wait for all dereplication flags
-        done_flags = [os.path.join(out_derep, f"done_{sid}.flag") for sid in sample_ids]
-        print("[wait] Waiting for all dereplication steps to complete...")
-        while True:
-            done_count = sum(os.path.exists(flag) for flag in done_flags)
-            if done_count == len(done_flags):
-                break
-            time.sleep(5)
-        print("[done] All dereplication samples complete.")
+        rep_seq_src: str, rep_seq_dst: str
+    ) -> str:
 
-        # Combine all cleaned_clusterRes_all_seqs.fasta files
-        with open(derep_fasta, 'w') as outfile:
-            for root, _, files in os.walk(out_derep):
-                for file in files:
-                    if file.endswith("cleaned_clusterRes_all_seqs.fasta"):
-                        with open(os.path.join(root, file)) as infile:
-                            shutil.copyfileobj(infile, outfile)
-
-        # Run clustering
-        os.makedirs(out_cluster, exist_ok=True)
-        cmd_mmseqs_cluster = [
-            "conda", "run", "-n", "mmseqs2_env",
-            "mmseqs", "easy-cluster", derep_fasta, cluster_res_cluster, tmp_dir_cluster,
-            "--min-seq-id", "0.95", "-c", "0.75", "--cov-mode", "1"
-        ]
-        await run_subprocess(cmd_mmseqs_cluster)
-
-        # Copy rep seqs to query dir
-        os.makedirs(rep_seq_dst, exist_ok=True)
-        shutil.copy(rep_seq_src, os.path.join(rep_seq_dst, "clusterRes_rep_seq.fasta"))
-        query_dir = rep_seq_dst
-        return query_dir
+        future = cluster_app(
+            sample_ids, out_derep, derep_fasta, out_cluster,
+            cluster_res_cluster, tmp_dir_cluster, rep_seq_src, rep_seq_dst
+        )
+        result = await asyncio.to_thread(future.result)
+        return result
 
 
-# === Make BLAST DB ===
-
-def make_blast_db(db_dir, max_db_size, db_list_path):
-
-    """
-    Scans DB_DIR for all .fasta files and builds BLAST databases using apptainer and makeblastdb.
-    """
+# === Python App: Split FASTA ===
+@python_app
+def split_fasta_app(fasta_file: str, split_dir: str, split_size: int):
+    import os
     import subprocess
-    import os 
+    import shutil
 
-    print(f"Working in: {db_dir}")
+    if os.path.exists(split_dir):
+        shutil.rmtree(split_dir)
+    os.makedirs(split_dir, exist_ok=True)
+
+    cmd = [
+        "conda", "run", "-n", "fasplit_env",
+        "faSplit", "about", fasta_file, str(split_size), f"{split_dir}/"
+    ]
+    subprocess.run(cmd, check=True)
+    return split_dir
+
+
+# === Python App: Make BLAST DB ===
+@python_app
+def make_blast_db_app(db_dir: str, max_db_size: int, db_list_path: str):
+    import os
+    import subprocess
+
+    os.makedirs(db_dir, exist_ok=True)
     os.chdir(db_dir)
 
-    # === Generate db-list file using os.walk ===
-
     with open(db_list_path, "w") as db_list:
-        for root, dirs, files in os.walk("."):
+        for root, _, files in os.walk("."):
             for file in files:
                 if file.endswith(".fasta"):
                     rel_path = os.path.join(root, file).lstrip("./")
                     db_list.write(rel_path + "\n")
 
-    # === Check if db-list exists and is non-empty ===
-
     if not os.path.exists(db_list_path) or os.path.getsize(db_list_path) == 0:
-        print(f"Cannot find or empty database list: {db_list_path}")
-        return
-
-    # === Process each FASTA file ===
+        raise FileNotFoundError(f"Empty or missing db list: {db_list_path}")
 
     with open(db_list_path) as f:
-        for i, line in enumerate(f, start=1):
+        for line in f:
             db_file = line.strip()
-            db_name = os.path.basename(db_file)
+            db_name = os.path.splitext(os.path.basename(db_file))[0]
+            db_prefix = os.path.join(db_dir, db_name)
 
-            print(f"{i:5d}: {db_name}")
-
-            # Build and run makeblastdb command via apptainer
+            if all(os.path.exists(f"{db_prefix}.{ext}") for ext in ["nhr", "nin", "nsq"]):
+                continue
 
             cmd = [
                 "conda", "run", "-n", "blast_env",
                 "makeblastdb",
                 "-title", db_name,
-                "-out", db_name,
+                "-out", db_prefix,
                 "-in", db_file,
                 "-dbtype", "nucl",
                 "-max_file_sz", str(max_db_size)
             ]
-
             subprocess.run(cmd, check=True)
 
-    # === Print finish time ===
+    return "blast_db_complete"
 
-    result = subprocess.run(["date"], capture_output=True, text=True)
-    print(f"Finished {result.stdout.strip()}")
 
-    return db_name 
+# === Python App: Run BLAST ===
+@python_app
+def run_blast_app(
+    split_dir, blast_results_dir, db_dir,
+    blast_type, eval_param, out_fmt, max_target_seqs
+):
+    import os
+    import subprocess
 
-# === BLAST Agent ===
+    split_files = sorted(f for f in os.listdir(split_dir) if f.endswith(".fa"))
+    db_list_path = os.path.join(db_dir, "db-list")
 
-import os
-import shutil
-from academy.agent import Agent, action
+    with open(db_list_path, 'r') as f:
+        databases = [line.strip() for line in f.readlines()]
 
+    for split_file in split_files:
+        for db in databases:
+            result_dir = os.path.join(blast_results_dir, db, split_file)
+            os.makedirs(result_dir, exist_ok=True)
+            blast_out = os.path.join(result_dir, f"{split_file}.blastout")
+            blast_db = os.path.join(db_dir, db)
+
+            cmd = [
+                "conda", "run", "-n", "blast_env", blast_type,
+                "-num_threads", "48",
+                "-db", blast_db,
+                "-query", os.path.join(split_dir, split_file),
+                "-out", blast_out,
+                "-evalue", str(eval_param),
+                "-outfmt", str(out_fmt),
+                "-max_target_seqs", str(max_target_seqs)
+            ]
+            subprocess.run(cmd, check=True)
+
+    return "blast_complete"
+
+
+# === Python App: Merge Results ===
+@python_app
+def merge_blast_results_app(work_dir, merge_results_dir, db_dir, file_name):
+    import os
+
+    db_list_path = os.path.join(db_dir, "db-list")
+    with open(db_list_path) as f:
+        databases = [line.strip() for line in f.readlines()]
+
+    for db in databases:
+        results_by_db = os.path.join(merge_results_dir, db)
+        os.makedirs(results_by_db, exist_ok=True)
+        blast_out_dir = os.path.join(work_dir, "results", "05C_blast", db, file_name)
+        blast_results = os.path.join(results_by_db, f"{file_name}.txt")
+        blast_gff = os.path.join(results_by_db, f"{file_name}.gff")
+
+        with open(blast_results, 'w') as outfile:
+            for result_file in os.listdir(blast_out_dir):
+                with open(os.path.join(blast_out_dir, result_file), 'r') as infile:
+                    outfile.write(infile.read())
+
+        with open(blast_results, 'r') as infile, open(blast_gff, 'w') as outfile:
+            for line in infile:
+                fields = line.strip().split('\t')
+                if len(fields) > 7:
+                    gff_line = f"{fields[0]}\tblast\tgene\t{fields[6]}\t{fields[7]}\t.\t.\t.\tID=Gene{fields[6]};Name={fields[1]}\n"
+                    outfile.write(gff_line)
+
+    return os.path.join(merge_results_dir, "AVrC_allrepresentatives.fasta", "clusterRes_rep_seq.fasta.txt")
+
+
+# === Agent: Blast ===
 class BLASTAgent(Agent):
-
-    async def _make_blast_db(self, db_dir: str, max_db_size: str, db_list_path: str):
-        """
-        Check if BLAST databases already exist, and run makeblastdb if they don't.
-        """
-        print(f"[BLAST DB] Checking in: {db_dir}")
-        os.makedirs(db_dir, exist_ok=True)
-        os.chdir(db_dir)
-
-        # Generate db-list file using os.walk
-        with open(db_list_path, "w") as db_list:
-            for root, _, files in os.walk("."):
-                for file in files:
-                    if file.endswith(".fasta"):
-                        rel_path = os.path.join(root, file).lstrip("./")
-                        db_list.write(rel_path + "\n")
-
-        if not os.path.exists(db_list_path) or os.path.getsize(db_list_path) == 0:
-            print(f"[BLAST DB] Cannot find or empty database list: {db_list_path}")
-            return
-
-        # Process each FASTA file
-        with open(db_list_path) as f:
-            for i, line in enumerate(f, start=1):
-                db_file = line.strip()
-                db_name = os.path.splitext(os.path.basename(db_file))[0]
-                db_prefix = os.path.join(db_dir, db_name)
-
-                # Skip if already made
-                if all(os.path.exists(f"{db_prefix}.{ext}") for ext in ["nhr", "nin", "nsq"]):
-                    print(f"[BLAST DB] Database already exists: {db_name}")
-                    continue
-
-                print(f"[BLAST DB] Creating: {db_name}")
-                cmd = [
-                    "conda", "run", "-n", "blast_env",
-                    "makeblastdb",
-                    "-title", db_name,
-                    "-out", db_prefix,
-                    "-in", db_file,
-                    "-dbtype", "nucl",
-                    "-max_file_sz", str(max_db_size)
-                ]
-                subprocess.run(cmd, check=True)
-        print("[BLAST DB] Setup complete.")
-        return db_name
+    def __init__(self):
+        # Load config once on creation
+        parsl.clear()
+        parsl.load(blast_config)
 
     @action
     async def run_full_blast(
@@ -329,108 +561,43 @@ class BLASTAgent(Agent):
         results_dir: str, query_dir: str, db_dir: str,
         blast_results_dir: str, blast_type: str, eval_param: float,
         out_fmt: int, max_target_seqs: int, merge_results_dir: str,
-        max_db_size: int, db_list_path: str) -> str:
-        
-        # === Make BLAST DB if needed ===
-        db_name = await self._make_blast_db(db_dir, max_db_size, db_list_path)
-
-        # === Reinitialize BLAST results directory ===
+        max_db_size: int, db_list_path: str
+    ) -> str:
+        # Clean output dirs
         if os.path.exists(results_dir):
             shutil.rmtree(results_dir)
         os.makedirs(results_dir, exist_ok=True)
 
-        # === Find input FASTA file ===
-        fasta_file = None
-        for root, _, files in os.walk(query_dir):
-            for file in files:
-                if file.endswith(".fasta"):
-                    fasta_file = os.path.join(root, file)
-                    break
-            if fasta_file:
-                break
+        # Find FASTA file
+        fasta_file = next(
+            (os.path.join(root, file)
+             for root, _, files in os.walk(query_dir)
+             for file in files if file.endswith(".fasta")),
+            None
+        )
         if not fasta_file:
             raise FileNotFoundError("No .fasta file found in query directory.")
-
         file_name = os.path.basename(fasta_file)
 
-        # === Split FASTA using faSplit ===
-
+        # 1. Split FASTA
         split_dir = os.path.join(query_dir, "fa_split")
+        split_future = split_fasta_app(fasta_file, split_dir, split_size)
+        split_result = await asyncio.to_thread(split_future.result)
 
-        if os.path.exists(split_dir):
-            shutil.rmtree(split_dir)
-        os.makedirs(split_dir)
+        # 2. Make BLAST DB
+        db_future = make_blast_db_app(db_dir, max_db_size, db_list_path)
+        await asyncio.to_thread(db_future.result)
 
-        print(f"[faSplit] Splitting {file_name} into chunks of size {split_size}")
-        cmd_split = [
-            "conda", "run", "-n", "fasplit_env",
-            "faSplit", "about", fasta_file, str(split_size), f"{split_dir}/"
-        ]
-        await run_subprocess(cmd_split)
+        # 3. Run BLAST
+        blast_future = run_blast_app(split_result, blast_results_dir, db_dir, blast_type, eval_param, out_fmt, max_target_seqs)
+        await asyncio.to_thread(blast_future.result)
 
-        # === Save list of split files ===
-        split_files = sorted([f for f in os.listdir(split_dir) if f.endswith(".fa")])
-        num_split = len(split_files)
-        print(f"[faSplit] {num_split} split files created.")
+        # 4. Merge
+        merge_future = merge_blast_results_app(work_dir, merge_results_dir, db_dir, file_name)
+        hits_file = await asyncio.to_thread(merge_future.result)
 
-        split_files_list = os.path.join(split_dir, "split_files_list.txt")
-        with open(split_files_list, "w") as f:
-            for sfile in split_files:
-                f.write(sfile + "\n")
-
-        # === Run BLAST on each split file ===
-        db_list_path = os.path.join(db_dir, "db-list")
-        with open(db_list_path, 'r') as f:
-            databases = [line.strip() for line in f.readlines()]
-
-        for task_id, split_file in enumerate(split_files):
-            for i, db in enumerate(databases, 1):
-                print(f"[BLAST] Split {task_id}, DB {i}: {db}")
-                results_by_db = os.path.join(blast_results_dir, db, split_file)
-                os.makedirs(results_by_db, exist_ok=True)
-                blast_out = os.path.join(results_by_db, f"{split_file}.blastout")
-                blast_db = os.path.join(db_dir, db)
-
-                cmd_blast = [
-                    "conda", "run", "-n", "blast_env", blast_type,
-                    "-num_threads", "48",
-                    "-db", blast_db,
-                    "-query", os.path.join(split_dir, split_file),
-                    "-out", blast_out,
-                    "-evalue", str(eval_param),
-                    "-outfmt", str(out_fmt),
-                    "-max_target_seqs", str(max_target_seqs)
-                ]
-                await run_subprocess(cmd_blast)
-
-        # === Merge BLAST results and convert to GFF ===
-        os.makedirs(merge_results_dir, exist_ok=True)
-
-        for i, db in enumerate(databases, 1):
-            print(f"[Merge] Processing DB {i}: {db}")
-            results_by_db = os.path.join(merge_results_dir, db)
-            os.makedirs(results_by_db, exist_ok=True)
-
-            blast_out_dir = os.path.join(work_dir, "results", "05C_blast", db, file_name)
-            blast_results = os.path.join(results_by_db, f"{file_name}.txt")
-            blast_gff = os.path.join(results_by_db, f"{file_name}.gff")
-
-            with open(blast_results, 'w') as outfile:
-                for result_file in os.listdir(blast_out_dir):
-                    with open(os.path.join(blast_out_dir, result_file), 'r') as infile:
-                        outfile.write(infile.read())
-
-            print(f"[Convert] Writing GFF for {db}")
-            with open(blast_results, 'r') as infile, open(blast_gff, 'w') as outfile:
-                for line in infile:
-                    fields = line.strip().split('\t')
-                    if len(fields) > 7:
-                        gff_line = f"{fields[0]}\tblast\tgene\t{fields[6]}\t{fields[7]}\t.\t.\t.\tID=Gene{fields[6]};Name={fields[1]}\n"
-                        outfile.write(gff_line)
-
-        print("[BLAST] All steps complete.")
-        hits_file = os.path.join(merge_results_dir, "AVrC_allrepresentatives.fasta", "clusterRes_rep_seq.fasta.txt")
         return hits_file
+
 
 # === Annotation ===
 
@@ -475,22 +642,17 @@ def annotate_blast(hits_file, annotations_dir, output_dir, script_path, pctid, l
     final = "Pipeline Complete."
     return final
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from academy.manager import Manager
-from academy.exchange.local import LocalExchangeFactory
-
 # Helper for per-sample pipeline
-async def process_sample(sample_id, config, genomad_handle, checkv_handle, cluster_handle, first_sample_id):
+async def process_sample(sample_id, config, viral_handle, checkv_handle, cluster_handle, first_sample_id):
     # === Unzip ===
     spades_gz = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz")
     unzipped_spades_path = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
-    unzipped_spades = unzip_fasta(spades_gz, unzipped_spades_path)
+    unzipped_spades = await(await viral_handle.unzip_fasta(spades_gz, unzipped_spades_path))
 
     # === GeNomad ===
     genomad_output_dir = os.path.join(config['OUT_GENOMAD'], sample_id)
     db = config["GENOMAD_DB"]
-    genomad_virus = await(await genomad_handle.run_genomad(unzipped_spades, genomad_output_dir, db))
+    genomad_virus = await(await viral_handle.run_tool(unzipped_spades, genomad_output_dir, db))
 
     # === CheckV ===
     checkv_parser = config["CHECKV_PARSER"]
@@ -527,7 +689,7 @@ async def main():
         factory=LocalExchangeFactory(),
         executors=ThreadPoolExecutor()
     ) as manager:
-        genomad_handle = await manager.launch(GeNomadAgent())
+        viral_handle = await manager.launch(ViralDetectionAgent())
         checkv_handle = await manager.launch(CheckVAgent())
         cluster_handle = await manager.launch(DereplicationClusteringAgent())
         blast_handle = await manager.launch(BLASTAgent())
@@ -542,7 +704,7 @@ async def main():
         first_sample_id = sample_ids[0]  # Choose one sample to return the derep_fasta
 
         per_sample_tasks = [
-            asyncio.create_task(process_sample(sid, config, genomad_handle, checkv_handle, cluster_handle, first_sample_id))
+            asyncio.create_task(process_sample(sid, config, viral_handle, checkv_handle, cluster_handle, first_sample_id))
             for sid in sample_ids
         ]
 

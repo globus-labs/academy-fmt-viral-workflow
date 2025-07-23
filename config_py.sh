@@ -9,11 +9,11 @@ export XFILE_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses
 export SPADES_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/out_spades
 
 # variables used for 3 viromics tools as well as checkv 
-#export OUT_VIRSORT=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results/01B_checkv_virsorter
+export OUT_VIRSORT=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results_testing/01B_checkv_virsorter
 export CHECKVDB=/xdisk/bhurwitz/databases/checkv-db-v1.5  
-#export OUT_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results/02A_dvf
-#export DVF_DB=/groups/bhurwitz/databases/DeepVirFinder
-#export OUT_CHECKV_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results/02B_checkv_dvf
+export OUT_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results_testing/02A_dvf
+export DVF_DB=/xdisk/bhurwitz/databases/DeepVirFinder
+export OUT_CHECKV_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/viral_detection_pipeline/results_testing/02B_checkv_dvf
 export OUT_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03A_genomad
 export GENOMAD_DB=/xdisk/bhurwitz/databases/genomad_db          
 export OUT_CHECKV_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03B_checkv_genomad

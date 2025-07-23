@@ -26,15 +26,12 @@ from parsl.executors import HighThroughputExecutor
 from parsl.launchers import SrunLauncher
 from parsl.providers import SlurmProvider
 from parsl.usage_tracking.levels import LEVEL_1
-from parsl.addresses import address_by_hostname
-from parsl.addresses import address_by_interface
 
 
 HTEX = Config(
      executors=[
           HighThroughputExecutor(
                label="Parsl_htex",
-               #address=address_by_interface('eth0'), 
                worker_debug=False,
                cores_per_worker=1.0,
                max_workers_per_node=94,
