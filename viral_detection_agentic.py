@@ -259,24 +259,23 @@ class ViralDetectionAgent(Agent):
         return await asyncio.to_thread(future.result)
 
     @action
-    async def run_deepvirfinder(self, unzipped_spades: str, dvf_output_dir: str) -> str:
-        future = deepvirfinder_app(unzipped_spades, dvf_output_dir)
+    async def run_deepvirfinder(self, unzipped_spades: str, dvf_output_dir: str, 
+                                dvf_db: str, work_dir: str, script_dir: str) -> str:
+        future = deepvirfinder_app(unzipped_spades, dvf_output_dir, dvf_db, work_dir, script_dir)
         return await asyncio.to_thread(future.result)
 
     @action
-    async def run_tool(self, unzipped_spades: str, genomad_output_dir: str, db: str, 
+    async def run_tool(self, tool, unzipped_spades: str, genomad_output_dir: str, db: str, 
                        virsorter_output_dir: str, dvf_output_dir: str, dvf_db: str, 
                        work_dir: str, script_dir: str) -> str:
-        tool = random.choice(["genomad", "virsorter", "deepvirfinder"])
-        print(f"[INFO] Selected tool: {tool}")
-
-        if tool == "genomad":
+        
+        if tool == "GeNomad":
             result = await self.run_genomad(unzipped_spades, genomad_output_dir, db)
-        elif tool == "virsorter":
+        elif tool == "VirSorter2":
             result =  await self.run_virsorter(unzipped_spades, virsorter_output_dir)
         else:
             result = await self.run_deepvirfinder(unzipped_spades, dvf_output_dir, dvf_db, work_dir, script_dir)
-    return result
+        return result
 
 # Parsl Python app for CheckV
 @python_app
@@ -309,7 +308,28 @@ def checkv_app(checkv_parser, parse_length, work_dir,
         subprocess.run(cmd_seqtk, check=True, stdout=out_f)
 
     os.chdir(work_dir)
-    return subset_spades
+    total = 0
+    high_quality = 0
+    quality = os.path.join(checkv_output_dir, "quality_summary.tsv")
+    with open(quality, 'r') as f:
+        for line in f:
+            # Skip the header line
+            if line.startswith("contig_id") or line.strip() == "":
+                continue
+            columns = line.strip().split('\t')
+
+            if len(columns) < 8:
+                continue  # Skip incomplete lines
+
+            quality = columns[7].strip()
+            total += 1
+            if quality == "High-quality":
+                high_quality += 1
+    if total == 0:
+        quality_ratio =  0.0
+    quality_ratio =  high_quality / total
+
+    return subset_spades, quality_ratio
 
 # Agent class using the app
 class CheckVAgent(Agent):
@@ -333,9 +353,9 @@ class CheckVAgent(Agent):
         )
 
         # Await the result asynchronously
-        result = await asyncio.to_thread(future.result)
+        subset_spades, quality_ratio = await asyncio.to_thread(future.result)
 
-        return result
+        return subset_spades, quality_ratio
 
 # === Dereplication/Clustering Agent ===
 
@@ -403,7 +423,7 @@ def cluster_app(
 
     os.makedirs(rep_seq_dst, exist_ok=True)
     shutil.copy(rep_seq_src, os.path.join(rep_seq_dst, "clusterRes_rep_seq.fasta"))
-    return rep_seq_dst
+    return rep_seq_dst, rep_seq_src
 
 # === Agent ===
 
@@ -439,8 +459,8 @@ class DereplicationClusteringAgent(Agent):
             sample_ids, out_derep, derep_fasta, out_cluster,
             cluster_res_cluster, tmp_dir_cluster, rep_seq_src, rep_seq_dst
         )
-        result = await asyncio.to_thread(future.result)
-        return result
+        rep_seq_dst, rep_seq_src = await asyncio.to_thread(future.result)
+        return rep_seq_dst, rep_seq_src
 
 
 # === Python App: Split FASTA ===
@@ -582,7 +602,7 @@ class BLASTAgent(Agent):
     @action
     async def run_full_blast(
         self, work_dir: str, split_size: int,
-        results_dir: str, query_dir: str, db_dir: str,
+        results_dir: str, query_dir: str, cluster_file: str, db_dir: str,
         blast_results_dir: str, blast_type: str, eval_param: float,
         out_fmt: int, max_target_seqs: int, merge_results_dir: str,
         max_db_size: int, db_list_path: str
@@ -619,8 +639,33 @@ class BLASTAgent(Agent):
         # 4. Merge
         merge_future = merge_blast_results_app(work_dir, merge_results_dir, db_dir, file_name)
         hits_file = await asyncio.to_thread(merge_future.result)
+       
+        # Get all headers from the FASTA file
+        cluster_contigs = set()
+        with open(cluster_file, 'r') as f:
+            for line in f:
+                if line.startswith(">"):
+                    header = line[1:].strip()
+                    cluster_contigs.add(header)
 
-        return hits_file
+        # Get all contig names from the TXT file
+        hits_contigs = set()
+        with open(hits_file, 'r') as f:
+            for line in f:
+                if line.strip():  # skip empty lines
+                    contig = line.split()[0].strip()
+                    hits_contigs.add(contig)
+
+        # Calculate intersection
+        matching_contigs = cluster_contigs & hits_contigs
+
+        # Print stats
+        print(f"Total contigs in FASTA: {len(cluster_contigs)}")
+        print(f"Contigs in TXT file: {len(hits_contigs)}")
+        print(f"Matching contigs: {len(matching_contigs)}")
+        match_ratio = len(matching_contigs) / len(cluster_contigs) 
+        print(f"Fraction matched: {match_ratio:.4f}")
+        return hits_file, match_ratio
 
 
 # === Annotation ===
@@ -667,7 +712,7 @@ def annotate_blast(hits_file, annotations_dir, output_dir, script_path, pctid, l
     return final
 
 # Helper for per-sample pipeline
-async def process_sample(sample_id, config, viral_handle, checkv_handle, cluster_handle, first_sample_id):
+async def process_sample(sample_id, config, tool, viral_handle, checkv_handle, cluster_handle, first_sample_id):
     # === Unzip ===
     spades_gz = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz")
     unzipped_spades_path = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
@@ -681,20 +726,21 @@ async def process_sample(sample_id, config, viral_handle, checkv_handle, cluster
     dvf_db = config["DVF_DB"]
     work_dir = config["WORK_DIR"]
     script_dir = config["SCRIPT_DIR"]
-    viral_result = await(await viral_handle.run_tool(unzipped_spades, genomad_output_dir, db, virsorter_output_dir, 
+    viral_result = await(await viral_handle.run_tool(tool, unzipped_spades, genomad_output_dir, db, virsorter_output_dir, 
                                                       dvf_output_dir, dvf_db, work_dir, script_dir))
 
     # === CheckV ===
     checkv_parser = config["CHECKV_PARSER"]
     parse_length = str(config["PARSE_LENGTH"])
     work_dir = config["WORK_DIR"]
-    checkv_output_dir = os.path.join(config["OUT_CHECKV_GENOMAD"], sample_id)
+    checkv_output_dir = os.path.join(config["OUT_CHECKV"], sample_id)
     parse_input = os.path.join(checkv_output_dir, "contamination.tsv")
     selection_csv = os.path.join(checkv_output_dir, "selection2_viral.csv")
     checkvdb = config["CHECKVDB"]
-    subset_spades = await(await checkv_handle.run_checkv(
+    subset_spades, quality_ratio = await(await checkv_handle.run_checkv(
         checkv_parser, parse_length, work_dir, unzipped_spades, viral_result,
         checkv_output_dir, parse_input, selection_csv, checkvdb))
+    print(quality_ratio)
 
     # === Dereplication ===
     cluster_dir = os.path.join(config["OUT_DEREP"], sample_id)
@@ -707,11 +753,8 @@ async def process_sample(sample_id, config, viral_handle, checkv_handle, cluster
         sample_id, subset_spades, cluster_dir, cluster_res_derep,
         tmp_dir_derep, input_fasta, cleaned_fasta, out_derep))
 
-    # === Only return derep_fasta from the first sample ===
-    if sample_id == first_sample_id:
-        return derep_fasta
-    else:
-        return None
+    return derep_fasta if sample_id == first_sample_id else None, quality_ratio
+
 
 # === Main function ===
 async def main():
@@ -730,19 +773,24 @@ async def main():
         sample_ids_file = os.path.join(config['XFILE_DIR'], config['XFILE'])
         sample_ids = read_sample_ids(sample_ids_file)
 
+        tool = random.choice(["GeNomad", "VirSorter2", "DeepVirFinder"])
+        print(f"[MAIN] Chosen tool for all samples: {tool}")
         # === Run all samples in parallel ===
         first_sample_id = sample_ids[0]  # Choose one sample to return the derep_fasta
 
         per_sample_tasks = [
-            asyncio.create_task(process_sample(sid, config, viral_handle, checkv_handle, cluster_handle, first_sample_id))
+            asyncio.create_task(process_sample(sid, config, tool, viral_handle, checkv_handle, cluster_handle, first_sample_id))
             for sid in sample_ids
         ]
 
         results = await asyncio.gather(*per_sample_tasks)
-
-        # Only one of them should return a non-None derep_fasta
-        derep_fasta = next((r for r in results if r is not None), None)
-
+        quality_ratios = [qr for _, qr in results if qr is not None]
+        if quality_ratios:
+            avg_quality_ratio = sum(quality_ratios) / len(quality_ratios)
+            print(f"[MAIN] Average quality ratio: {avg_quality_ratio:.4f}")
+        else:
+            print("[MAIN] No quality ratios returned.")
+        derep_fasta = next((df for df, _ in results if df is not None), None)
         if derep_fasta is None:
             raise ValueError("Dereplicated FASTA not found from any sample.")
 
@@ -754,7 +802,7 @@ async def main():
         rep_seq_src = os.path.join(out_cluster, "clusterRes_rep_seq.fasta")
         rep_seq_dst = os.path.join(work_dir, "query")
         out_derep = config["OUT_DEREP"]
-        query_dir = await(await cluster_handle.run_cluster(
+        query_dir, cluster_file = await(await cluster_handle.run_cluster(
             sample_ids, out_derep, derep_fasta, out_cluster,
             cluster_res_cluster, tmp_dir_cluster, rep_seq_src, rep_seq_dst))
 
@@ -773,10 +821,11 @@ async def main():
         out_fmt = config["OUT_FMT"]
         max_target_seqs = config["MAX_TARGET_SEQS"]
         merge_results_dir = os.path.join(work_dir, "results_testing", "05D_mergeblast")
-        hits_file = await(await blast_handle.run_full_blast(
-            work_dir, split_size, results_dir, query_dir, db_dir,
+        hits_file, match_ratio = await(await blast_handle.run_full_blast(
+            work_dir, split_size, results_dir, query_dir, cluster_file, db_dir,
             blast_results_dir, blast_type, eval_param, out_fmt,
             max_target_seqs, merge_results_dir, max_db_size, db_list_path))
+        print("BLAST Match Ratio: ", match_ratio)
 
         # === Annotation ===
         annotations_dir = config['ANNOTATIONS']
