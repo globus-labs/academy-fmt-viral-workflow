@@ -10,7 +10,7 @@ import time
 import parsl
 import asyncio
 from parsl import python_app
-from academy.agent import Agent, action
+from academy.agent import Agent, action, loop
 from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.launchers import SrunLauncher
@@ -18,9 +18,6 @@ from parsl.providers import SlurmProvider
 from parsl.usage_tracking.levels import LEVEL_1
 import random
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from academy.manager import Manager
-from academy.exchange.local import LocalExchangeFactory
 
 
 viral_config = Config(
@@ -150,7 +147,9 @@ def read_sample_ids(sample_ids_file):
 def unzip_fasta_app(spades_gz, unzipped_spades_path):
     import subprocess
     import os
+    import socket
 
+    print("Unzip Running on node:", socket.gethostname(), flush=True)
     if os.path.exists(unzipped_spades_path):
         print(f"[INFO] File already exists: {unzipped_spades_path}", flush=True)
         return unzipped_spades_path
@@ -182,6 +181,8 @@ async def run_subprocess(cmd, **kwargs):
 def virsorter_app(unzipped_spades, virsorter_output_dir):
     import subprocess
     import os
+    import socket
+    print("VirSorter Running on node:", socket.gethostname(), flush=True)
     cmd = [
         "conda", "run", "-n", "virsorter2_env",
         "virsorter", "run", "-w", virsorter_output_dir,
@@ -195,7 +196,8 @@ def deepvirfinder_app(unzipped_spades, dvf_output_dir, dvf_db, work_dir, script_
     import subprocess
     import os
     os.chdir(dvf_db)
-
+    import socket
+    print("DeepVirFinder Running on node:", socket.gethostname(), flush=True)
     cmd = [
         "conda", "run", "-n", "dvf_env",
         "python", "dvf.py",
@@ -228,6 +230,8 @@ def deepvirfinder_app(unzipped_spades, dvf_output_dir, dvf_db, work_dir, script_
 def genomad_app(unzipped_spades, genomad_output_dir, db):
     import subprocess
     import os
+    import socket
+    print("GeNomad Running on node:", socket.gethostname(), flush=True)
     cmd = [
         "conda", "run", "-n", "genomad_env",
         "genomad", "end-to-end", "--cleanup", 
@@ -284,7 +288,8 @@ def checkv_app(checkv_parser, parse_length, work_dir,
                parse_input, selection_csv, checkvdb):
     import os
     import subprocess
-
+    import socket
+    print("CheckV Running on node:", socket.gethostname(), flush=True)
     os.makedirs(checkv_output_dir, exist_ok=True)
 
     cmd_checkv = [
@@ -302,7 +307,14 @@ def checkv_app(checkv_parser, parse_length, work_dir,
 
     subprocess.run(cmd_checkv, check=True)
     subprocess.run(cmd_parser, check=True)
-
+    cleaned_selection_csv = selection_csv.replace(".csv", "_cleaned.csv")
+    with open(selection_csv, "r") as infile, open(cleaned_selection_csv, "w") as outfile:
+        for line in infile:
+            if line.startswith("contig_id"):
+                outfile.write(line)
+            else:
+                clean_line = line.split("||")[0].strip()
+                outfile.write(f"{clean_line}\n")
     subset_spades = os.path.join(checkv_output_dir, "subset_spades.fasta")
     with open(subset_spades, "w") as out_f:
         subprocess.run(cmd_seqtk, check=True, stdout=out_f)
@@ -368,7 +380,8 @@ def dereplicate_app(
 ):
     import os
     import subprocess
-
+    import socket
+    print("Dereplicate Running on node:", socket.gethostname(), flush=True)
     os.makedirs(cluster_dir, exist_ok=True)
 
     cmd_mmseqs_derep = [
@@ -401,7 +414,8 @@ def cluster_app(
     import shutil
     import time
     import subprocess
-
+    import socket
+    print("Cluster Running on node:", socket.gethostname(), flush=True)
     done_flags = [os.path.join(out_derep, f"done_{sid}.flag") for sid in sample_ids]
     while not all(os.path.exists(flag) for flag in done_flags):
         time.sleep(5)
@@ -469,7 +483,8 @@ def split_fasta_app(fasta_file: str, split_dir: str, split_size: int):
     import os
     import subprocess
     import shutil
-
+    import socket
+    print("Split Fasta Running on node:", socket.gethostname(), flush=True)
     if os.path.exists(split_dir):
         shutil.rmtree(split_dir)
     os.makedirs(split_dir, exist_ok=True)
@@ -487,7 +502,8 @@ def split_fasta_app(fasta_file: str, split_dir: str, split_size: int):
 def make_blast_db_app(db_dir: str, max_db_size: int, db_list_path: str):
     import os
     import subprocess
-
+    import socket
+    print("Make Blast Db Running on node:", socket.gethostname(), flush=True)
     os.makedirs(db_dir, exist_ok=True)
     os.chdir(db_dir)
 
@@ -532,7 +548,8 @@ def run_blast_app(
 ):
     import os
     import subprocess
-
+    import socket
+    print("BLAST Running on node:", socket.gethostname(), flush=True)
     split_files = sorted(f for f in os.listdir(split_dir) if f.endswith(".fa"))
     db_list_path = os.path.join(db_dir, "db-list")
 
@@ -565,7 +582,8 @@ def run_blast_app(
 @python_app
 def merge_blast_results_app(work_dir, merge_results_dir, db_dir, file_name):
     import os
-
+    import socket
+    print("Merge Blast Running on node:", socket.gethostname(), flush=True)
     db_list_path = os.path.join(db_dir, "db-list")
     with open(db_list_path) as f:
         databases = [line.strip() for line in f.readlines()]
@@ -710,6 +728,35 @@ def annotate_blast(hits_file, annotations_dir, output_dir, script_path, pctid, l
 
     final = "Pipeline Complete."
     return final
+
+class ToolSelector:
+    def __init__(self, alpha: float):
+        self.alpha = alpha
+        self.best_tool = None
+        self.best_score = -1.0
+        self.tool_scores = {}
+
+    def evaluate_tool(self, avg_quality_ratio: float, match_ratio: float) -> float:
+        """Combine CheckV and BLAST metrics into a single score."""
+        return (avg_quality_ratio + match_ratio) / 2
+
+    def update_tool_score(self, tool_name: str, avg_quality_ratio: float, match_ratio: float):
+        """Update score for a tool and track best tool so far."""
+        score = self.evaluate_tool(avg_quality_ratio, match_ratio)
+        self.tool_scores[tool_name] = score
+        if score > self.best_score:
+            self.best_score = score
+            self.best_tool = tool_name
+
+    def choose_tool(self, available_tools: list[str]) -> str:
+        """Choose the next tool using alpha-greedy strategy."""
+        if not self.best_tool or self.best_tool not in available_tools:
+            return random.choice(available_tools)
+
+        if random.random() < self.alpha:
+            return self.best_tool
+        else:
+            return random.choice(available_tools)
 
 class CoordinatorAgent(Agent):
     def __init__(self, viral_handle, checkv_handle, cluster_handle, blast_handle, config_path):
@@ -856,88 +903,6 @@ async def main():
         # Wait forever until external shutdown
         await asyncio.Event().wait()
 
-
-'''
-# === Main function ===
-async def main():
-    async with await Manager.from_exchange_factory(
-        factory=LocalExchangeFactory(),
-        executors=ThreadPoolExecutor()
-    ) as manager:
-        viral_handle = await manager.launch(ViralDetectionAgent())
-        checkv_handle = await manager.launch(CheckVAgent())
-        cluster_handle = await manager.launch(DereplicationClusteringAgent())
-        blast_handle = await manager.launch(BLASTAgent())
-
-        # === Load configuration ===
-        config_path = os.path.join(os.getcwd(), "config_py.sh")
-        config = make_config(config_path)
-        sample_ids_file = os.path.join(config['XFILE_DIR'], config['XFILE'])
-        sample_ids = read_sample_ids(sample_ids_file)
-
-        tool = random.choice(["GeNomad", "VirSorter2", "DeepVirFinder"])
-        print(f"[MAIN] Chosen tool for all samples: {tool}")
-        # === Run all samples in parallel ===
-        first_sample_id = sample_ids[0]  # Choose one sample to return the derep_fasta
-
-        per_sample_tasks = [
-            asyncio.create_task(process_sample(sid, config, tool, viral_handle, checkv_handle, cluster_handle, first_sample_id))
-            for sid in sample_ids
-        ]
-
-        results = await asyncio.gather(*per_sample_tasks)
-        quality_ratios = [qr for _, qr in results if qr is not None]
-        if quality_ratios:
-            avg_quality_ratio = sum(quality_ratios) / len(quality_ratios)
-            print(f"[MAIN] Average quality ratio: {avg_quality_ratio:.4f}")
-        else:
-            print("[MAIN] No quality ratios returned.")
-        derep_fasta = next((df for df, _ in results if df is not None), None)
-        if derep_fasta is None:
-            raise ValueError("Dereplicated FASTA not found from any sample.")
-
-        # === Cluster ===
-        out_cluster = config["OUT_CLUSTER"]
-        work_dir = config["WORK_DIR"]
-        cluster_res_cluster = os.path.join(out_cluster, "clusterRes")
-        tmp_dir_cluster = os.path.join(out_cluster, "tmp")
-        rep_seq_src = os.path.join(out_cluster, "clusterRes_rep_seq.fasta")
-        rep_seq_dst = os.path.join(work_dir, "query")
-        out_derep = config["OUT_DEREP"]
-        query_dir, cluster_file = await(await cluster_handle.run_cluster(
-            sample_ids, out_derep, derep_fasta, out_cluster,
-            cluster_res_cluster, tmp_dir_cluster, rep_seq_src, rep_seq_dst))
-
-        # === BLAST ===
-        db_dir = config["DB_DIR"]
-        max_db_size = config["MAX_DB_SIZE"]
-        db_list_path = os.path.join(db_dir, "db-list")
-        prog = "05B_launchblast"
-        fasta_dir = config["FASTA_DIR"]
-        split_size = config["FA_SPLIT_FILE_SIZE"]
-        results_dir = os.path.join(work_dir, "results_testing", prog)
-        files_list_path = os.path.join(fasta_dir, "fasta-files")
-        blast_results_dir = os.path.join(work_dir, "results_testing", "05C_blast")
-        blast_type = config["BLAST_TYPE"]
-        eval_param = config["EVAL"]
-        out_fmt = config["OUT_FMT"]
-        max_target_seqs = config["MAX_TARGET_SEQS"]
-        merge_results_dir = os.path.join(work_dir, "results_testing", "05D_mergeblast")
-        hits_file, match_ratio = await(await blast_handle.run_full_blast(
-            work_dir, split_size, results_dir, query_dir, cluster_file, db_dir,
-            blast_results_dir, blast_type, eval_param, out_fmt,
-            max_target_seqs, merge_results_dir, max_db_size, db_list_path))
-        print("BLAST Match Ratio: ", match_ratio)
-
-        # === Annotation ===
-        annotations_dir = config['ANNOTATIONS']
-        out_annotate = config['OUTPUT']
-        script_path = os.path.join(config['SCRIPT_DIR'], "solution1_manual.py")
-        pctid = config['PCTID']
-        length = config['LENGTH']
-        final = annotate_blast(hits_file, annotations_dir, out_annotate, script_path, pctid, length)
-        print(final)
-'''
 if __name__ == "__main__":
     asyncio.run(main())
 
