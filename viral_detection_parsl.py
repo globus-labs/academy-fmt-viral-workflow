@@ -40,7 +40,7 @@ HTEX = Config(
                     account='bhurwitz',
                     init_blocks=1,
                     mem_per_node=80,
-                    cores_per_node=94,
+                    cores_per_node=16,
                     nodes_per_block=1,
                     scheduler_options='',
                     cmd_timeout=60,
@@ -585,7 +585,7 @@ def main():
         unzipped_spades = unzip_fasta(spades_gz, unzipped_spades_path)
 
         # === Define variables for Genomad ===
-        genomad_output_dir = os.path.join(config['OUT_GENOMAD'], sample_id)
+        genomad_output_dir = os.path.join(config['OUT_GENOMAD_PARSL'], sample_id)
         db = config["GENOMAD_DB"]
         # === Run Genomad ===
         genomad_virus = run_genomad(unzipped_spades,genomad_output_dir,db)

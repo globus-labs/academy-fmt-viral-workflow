@@ -15,6 +15,7 @@ export OUT_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detect
 export DVF_DB=/xdisk/bhurwitz/databases/DeepVirFinder
 export OUT_CHECKV_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/02B_checkv_dvf
 export OUT_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03A_genomad
+export OUT_GENOMAD_PARSL=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl
 export GENOMAD_DB=/xdisk/bhurwitz/databases/genomad_db          
 export OUT_CHECKV_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03B_checkv_genomad
 export OUT_CHECKV=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/checkv

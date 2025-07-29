@@ -238,7 +238,7 @@ def genomad_app(unzipped_spades, genomad_output_dir, db):
         unzipped_spades, genomad_output_dir, db
     ]
     subprocess.run(cmd, check=True)
-    return os.path.join(output_dir, "contigs_summary", "contigs_virus.fna")
+    return os.path.join(genomad_output_dir, "contigs_summary", "contigs_virus.fna")
 
 class ViralDetectionAgent(Agent):
     def __init__(self):
@@ -289,8 +289,11 @@ def checkv_app(checkv_parser, parse_length, work_dir,
     import os
     import subprocess
     import socket
+    import shutil
     print("CheckV Running on node:", socket.gethostname(), flush=True)
-    os.makedirs(checkv_output_dir, exist_ok=True)
+    if os.path.exists(checkv_output_dir):
+        shutil.rmtree(checkv_output_dir)
+    os.makedirs(checkv_output_dir)
 
     cmd_checkv = [
         "conda", "run", "-n", "checkv_env", "checkv", "end_to_end",
@@ -299,10 +302,6 @@ def checkv_app(checkv_parser, parse_length, work_dir,
     cmd_parser = [
         "conda", "run", "-n", "r_env", "Rscript", checkv_parser,
         "-i", parse_input, "-l", parse_length, "-o", selection_csv
-    ]
-    cmd_seqtk = [
-        "conda", "run", "-n", "seqtk_env", "seqtk", "subseq",
-        unzipped_spades, selection_csv
     ]
 
     subprocess.run(cmd_checkv, check=True)
@@ -315,6 +314,10 @@ def checkv_app(checkv_parser, parse_length, work_dir,
             else:
                 clean_line = line.split("||")[0].strip()
                 outfile.write(f"{clean_line}\n")
+    cmd_seqtk = [
+        "conda", "run", "-n", "seqtk_env", "seqtk", "subseq",
+        unzipped_spades, cleaned_selection_csv
+    ]
     subset_spades = os.path.join(checkv_output_dir, "subset_spades.fasta")
     with open(subset_spades, "w") as out_f:
         subprocess.run(cmd_seqtk, check=True, stdout=out_f)
@@ -768,6 +771,8 @@ class CoordinatorAgent(Agent):
         self.config = make_config(config_path)
         self.selector = ToolSelector(alpha=0.5)
         self.current_tool = random.choice(["GeNomad", "VirSorter2", "DeepVirFinder"])
+        self.quality_ratios_history = []
+        self.match_ratios_history = []
     @loop
     async def continuous_pipeline(self, shutdown: asyncio.Event) -> None:
         round_count = 0
@@ -788,6 +793,7 @@ class CoordinatorAgent(Agent):
             # Process quality ratios
             quality_ratios = [qr for _, qr in results if qr is not None]
             avg_quality_ratio = sum(quality_ratios) / len(quality_ratios) if quality_ratios else 0.0
+            self.quality_ratios_history.append(avg_quality_ratio)
             print(f"[Coordinator] Average quality ratio: {avg_quality_ratio:.4f}", flush=True)
             # Find derep FASTA
             derep_fasta = next((df for df, _ in results if df is not None), None)
@@ -827,6 +833,7 @@ class CoordinatorAgent(Agent):
                 blast_results_dir, blast_type, eval_param, out_fmt,
                 max_target_seqs, merge_results_dir, max_db_size, db_list_path
             ))
+            self.match_ratios_history.append(match_ratio)
             print(f"[Coordinator] BLAST Match Ratio: {match_ratio:.4f}", flush=True)
             # === Update Tool Score and Select Next Tool ===
             self.selector.update_tool_score(self.current_tool, avg_quality_ratio, match_ratio)
@@ -841,9 +848,13 @@ class CoordinatorAgent(Agent):
             final = annotate_blast(hits_file, annotations_dir, out_annotate, script_path, pctid, length)
             print("[Coordinator] Final annotation summary:", final, flush=True)
             round_count += 1
-            if round_count >= 3:  # Stop after 3 rounds
-                print("[Coordinator] Completed 3 rounds. Initiating shutdown.", flush=True)
-                shutdown.set()   
+            if round_count >= 10:  # Stop after 10 rounds
+                print("[Coordinator] Completed 10 rounds. Initiating shutdown.", flush=True)
+                shutdown.set()
+                final_avg_quality = sum(self.quality_ratios_history) / len(self.quality_ratios_history) if self.quality_ratios_history else 0.0
+                final_avg_match = sum(self.match_ratios_history) / len(self.match_ratios_history) if self.match_ratios_history else 0.0
+                print(f"\n[Coordinator] FINAL average quality ratio over 10 rounds: {final_avg_quality:.4f}", flush=True)
+                print(f"[Coordinator] FINAL average match ratio over 10 rounds: {final_avg_match:.4f}\n", flush=True)   
                 break
             await asyncio.sleep(5)  # wait between rounds
 

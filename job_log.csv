@@ -16,3 +16,4 @@ start_time,end_time,script,config_type,nodes,cpus,mem_gb,exit_code
 2025-07-17 20:26:22,2025-07-17 23:03:39,viral_detection_parsl.py,parsl-embedded,1,35,80,0
 2025-07-18 07:59:06,2025-07-18 10:11:18,viral_detection_parsl.py,parsl-embedded,1,74,80,0
 2025-07-21 08:07:24,2025-07-21 10:24:03,viral_detection_agentic.py,slurm,1,94,81,0
+2025-07-29 10:17:08,2025-07-29 10:19:00,viral_detection_parsl.py,parsl-embedded,1,16,80,1
