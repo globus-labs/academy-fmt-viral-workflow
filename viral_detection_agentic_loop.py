@@ -33,10 +33,10 @@ viral_config = Config(
                     init_blocks=1,
                     mem_per_node=80,
                     cores_per_node=94,
-                    nodes_per_block=1,
+                    nodes_per_block=4,
                     scheduler_options='',
                     cmd_timeout=60,
-                    walltime='24:00:00',
+                    walltime='40:00:00',
                     launcher=SrunLauncher(),
                     worker_init='',
                ),
@@ -61,7 +61,7 @@ checkv_config = Config(
                     nodes_per_block=1,
                     scheduler_options='',
                     cmd_timeout=60,
-                    walltime='24:00:00',
+                    walltime='40:00:00',
                     launcher=SrunLauncher(),
                     worker_init='',
                ),
@@ -86,7 +86,7 @@ derep_cluster_config = Config(
                     nodes_per_block=1,
                     scheduler_options='',
                     cmd_timeout=60,
-                    walltime='24:00:00',
+                    walltime='40:00:00',
                     launcher=SrunLauncher(),
                     worker_init='',
                ),
@@ -111,7 +111,7 @@ blast_config = Config(
                     nodes_per_block=1,
                     scheduler_options='',
                     cmd_timeout=60,
-                    walltime='24:00:00',
+                    walltime='40:00:00',
                     launcher=SrunLauncher(),
                     worker_init='',
                ),
@@ -234,7 +234,7 @@ def genomad_app(unzipped_spades, genomad_output_dir, db):
     print("GeNomad Running on node:", socket.gethostname(), flush=True)
     cmd = [
         "conda", "run", "-n", "genomad_env",
-        "genomad", "end-to-end", "--cleanup", 
+        "genomad", "end-to-end", "--cleanup", "--restart", 
         unzipped_spades, genomad_output_dir, db
     ]
     subprocess.run(cmd, check=True)
@@ -773,6 +773,7 @@ class CoordinatorAgent(Agent):
         self.current_tool = random.choice(["GeNomad", "VirSorter2", "DeepVirFinder"])
         self.quality_ratios_history = []
         self.match_ratios_history = []
+        self.shutdown = shutdown_event
     @loop
     async def continuous_pipeline(self, shutdown: asyncio.Event) -> None:
         round_count = 0
@@ -850,11 +851,12 @@ class CoordinatorAgent(Agent):
             round_count += 1
             if round_count >= 10:  # Stop after 10 rounds
                 print("[Coordinator] Completed 10 rounds. Initiating shutdown.", flush=True)
-                shutdown.set()
+                self.shutdown.set()
                 final_avg_quality = sum(self.quality_ratios_history) / len(self.quality_ratios_history) if self.quality_ratios_history else 0.0
                 final_avg_match = sum(self.match_ratios_history) / len(self.match_ratios_history) if self.match_ratios_history else 0.0
                 print(f"\n[Coordinator] FINAL average quality ratio over 10 rounds: {final_avg_quality:.4f}", flush=True)
                 print(f"[Coordinator] FINAL average match ratio over 10 rounds: {final_avg_match:.4f}\n", flush=True)   
+                print(f"Best Tool: {self.selector.best_tool}", flush=True)
                 break
             await asyncio.sleep(5)  # wait between rounds
 
@@ -898,6 +900,7 @@ async def process_sample(sample_id, config, tool, viral_handle, checkv_handle, c
     return derep_fasta if sample_id == first_sample_id else None, quality_ratio
 
 async def main():
+    shutdown_event = asyncio.Event()
     async with await Manager.from_exchange_factory(
         factory=LocalExchangeFactory(),
         executors=ThreadPoolExecutor()
@@ -909,10 +912,11 @@ async def main():
         config_path = os.path.join(os.getcwd(), "config_py.sh")
         coordinator = await manager.launch(
             CoordinatorAgent,
-            args=(viral_handle, checkv_handle, cluster_handle, blast_handle, config_path)
+            args=(viral_handle, checkv_handle, cluster_handle, blast_handle, config_path, shutdown_event)
         )
-        # Wait forever until external shutdown
-        await asyncio.Event().wait()
+    await shutdown_event.wait()
+    print("[Main] Shutdown complete.")        
+
 
 if __name__ == "__main__":
     asyncio.run(main())
