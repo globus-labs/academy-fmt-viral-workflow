@@ -900,6 +900,8 @@ async def process_sample(sample_id, config, tool, viral_handle, checkv_handle, c
     return derep_fasta if sample_id == first_sample_id else None, quality_ratio
 
 async def main():
+    start_time = datetime.datetime.now()
+    print(f"[Main] Start time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
     shutdown_event = asyncio.Event()
     async with await Manager.from_exchange_factory(
         factory=LocalExchangeFactory(),
@@ -914,9 +916,11 @@ async def main():
             CoordinatorAgent,
             args=(viral_handle, checkv_handle, cluster_handle, blast_handle, config_path, shutdown_event)
         )
-    await shutdown_event.wait()
-    print("[Main] Shutdown complete.")        
-
+        await shutdown_event.wait()
+        print("[Main] Shutdown complete.")
+    end_time = datetime.datetime.now()
+    print(f"[Main] End time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+    print(f"[Main] Total runtime: {str(end_time - start_time)}", flush=True)
 
 if __name__ == "__main__":
     asyncio.run(main())
