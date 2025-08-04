@@ -18,7 +18,7 @@ from parsl.providers import SlurmProvider
 from parsl.usage_tracking.levels import LEVEL_1
 import random
 import asyncio
-
+import datetime
 
 viral_config = Config(
      executors=[
@@ -762,14 +762,14 @@ class ToolSelector:
             return random.choice(available_tools)
 
 class CoordinatorAgent(Agent):
-    def __init__(self, viral_handle, checkv_handle, cluster_handle, blast_handle, config_path):
+    def __init__(self, viral_handle, checkv_handle, cluster_handle, blast_handle, config_path, shutdown_event):
         super().__init__()
         self.viral_handle = viral_handle
         self.checkv_handle = checkv_handle
         self.cluster_handle = cluster_handle
         self.blast_handle = blast_handle
         self.config = make_config(config_path)
-        self.selector = ToolSelector(alpha=0.5)
+        self.selector = ToolSelector(alpha=0.6)
         self.current_tool = random.choice(["GeNomad", "VirSorter2", "DeepVirFinder"])
         self.quality_ratios_history = []
         self.match_ratios_history = []
@@ -857,6 +857,8 @@ class CoordinatorAgent(Agent):
                 print(f"\n[Coordinator] FINAL average quality ratio over 10 rounds: {final_avg_quality:.4f}", flush=True)
                 print(f"[Coordinator] FINAL average match ratio over 10 rounds: {final_avg_match:.4f}\n", flush=True)   
                 print(f"Best Tool: {self.selector.best_tool}", flush=True)
+                end_time = datetime.datetime.now()
+                print(f"[Main] End time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
                 break
             await asyncio.sleep(5)  # wait between rounds
 
