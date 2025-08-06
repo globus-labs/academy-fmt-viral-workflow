@@ -561,10 +561,11 @@ def run_blast_app(
 
     for split_file in split_files:
         for db in databases:
-            result_dir = os.path.join(blast_results_dir, db, split_file)
+            db_base = os.path.splitext(db)[0] 
+            result_dir = os.path.join(blast_results_dir, db_base, split_file)
             os.makedirs(result_dir, exist_ok=True)
             blast_out = os.path.join(result_dir, f"{split_file}.blastout")
-            blast_db = os.path.join(db_dir, db)
+            blast_db = os.path.join(db_dir, db_base)
 
             cmd = [
                 "conda", "run", "-n", "blast_env", blast_type,

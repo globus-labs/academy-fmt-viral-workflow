@@ -1,30 +1,63 @@
 Traceback (most recent call last):
-  File "/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/viral_detection_parsl.py", line 669, in <module>
-    main()
-    ~~~~^^
-  File "/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/viral_detection_parsl.py", line 655, in main
-    hits_file = run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
-  File "/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/viral_detection_parsl.py", line 361, in run_launch_blast
-    split_dir, file_name = fa_split_future.result()
-                           ~~~~~~~~~~~~~~~~~~~~~~^^
-  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/concurrent/futures/_base.py", line 451, in result
-    self._condition.wait(timeout)
-    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
-  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/threading.py", line 359, in wait
-    waiter.acquire()
+  File "/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/viral_detection_parsl1.py", line 23, in <module>
+    HighThroughputExecutor(
+    ~~~~~~~~~~~~~~~~~~~~~~^
+         label="Parsl_htex",
+         ^^^^^^^^^^^^^^^^^^^
+    ...<15 lines>...
+         ),
+         ^^
+    )
+    ^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/parsl/executors/high_throughput/executor.py", line 286, in __init__
+    self.all_addresses = ','.join(get_all_addresses())
+                                  ~~~~~~~~~~~~~~~~~^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/parsl/addresses.py", line 125, in get_all_addresses
+    s_addresses.add(f())
+                    ~^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/parsl/addresses.py", line 60, in address_by_query
+    response = requests.get('https://api.ipify.org', timeout=timeout)
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/urllib3/connection.py", line 516, in getresponse
+    httplib_response = super().getresponse()
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/http/client.py", line 1430, in getresponse
+    response.begin()
     ~~~~~~~~~~~~~~^^
-KeyboardInterrupt
-Traceback (most recent call last):
-  File "/xdisk/bhurwitz/miniconda3/bin/interchange.py", line 628, in <module>
-    ic.start()
-    ~~~~~~~~^^
-  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/parsl/process_loggers.py", line 26, in wrapped
-    r = func(*args, **kwargs)
-  File "/xdisk/bhurwitz/miniconda3/bin/interchange.py", line 312, in start
-    self.socks = dict(poller.poll(timeout=poll_period))
-                      ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
-  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/zmq/sugar/poll.py", line 106, in poll
-    return zmq_poll(self.sockets, timeout=timeout)
-  File "zmq/backend/cython/_zmq.py", line 1665, in zmq.backend.cython._zmq.zmq_poll
-  File "zmq/backend/cython/_zmq.py", line 176, in zmq.backend.cython._zmq._check_rc
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/http/client.py", line 292, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/socket.py", line 719, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/ssl.py", line 1304, in recv_into
+    return self.read(nbytes, buffer)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/ssl.py", line 1138, in read
+    return self._sslobj.read(len, buffer)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
 KeyboardInterrupt

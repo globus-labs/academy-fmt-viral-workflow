@@ -320,7 +320,8 @@ def make_blast_db(db_dir, max_db_size, db_list_path):
     with open(db_list_path) as f:
         for i, line in enumerate(f, start=1):
             db_file = line.strip()
-            db_name = os.path.basename(db_file)
+            db_base = os.path.splitext(db_file)[0] 
+            db_name = os.path.basename(db_base)
 
             print(f"{i:5d}: {db_name}")
 
