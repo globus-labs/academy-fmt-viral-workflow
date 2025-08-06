@@ -863,8 +863,7 @@ class CoordinatorAgent(Agent):
             await asyncio.sleep(5)  # wait between rounds
 
 # Helper for per-sample pipeline
-async def process_sample(sample_id, config, tool, viral_handle, checkv_handle, cluster_handle, first_sample_id):   
-    # === Unzip ===
+async def process_sample(sample_id, config, tool, viral_handle, checkv_handle, cluster_handle, first_sample_id):    # === Unzip ===
     spades_gz = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta.gz")
     unzipped_spades_path = os.path.join(config['SPADES_DIR'], sample_id, "contigs.fasta")
     unzipped_spades = await(await viral_handle.unzip_fasta(spades_gz, unzipped_spades_path))
@@ -876,13 +875,13 @@ async def process_sample(sample_id, config, tool, viral_handle, checkv_handle, c
     dvf_db = config["DVF_DB"]
     work_dir = config["WORK_DIR"]
     script_dir = config["SCRIPT_DIR"]
-    start_time = datetime.now()  
+    start_time = datetime.now()
     viral_result = await(await viral_handle.run_tool(tool, unzipped_spades, genomad_output_dir, db, virsorter_output_dir,
                                                       dvf_output_dir, dvf_db, work_dir, script_dir))
     end_time = datetime.now()
     elapsed = end_time - start_time
-    print("{tool} started at {start_time} and ended at {end_time} - duration: {elapsed}", flush=True)    
- 
+    print("{tool} started at {start_time} and ended at {end_time} - duration: {elapsed}", flush=True)
+    
     # === CheckV ===
     checkv_parser = config["CHECKV_PARSER"]
     parse_length = str(config["PARSE_LENGTH"])
@@ -919,7 +918,7 @@ async def main():
         checkv_handle = await manager.launch(CheckVAgent())
         cluster_handle = await manager.launch(DereplicationClusteringAgent())
         blast_handle = await manager.launch(BLASTAgent())
-        config_path = os.path.join(os.getcwd(), "config_py.sh")
+        config_path = os.path.join(os.getcwd(), "config_agentic.sh")
         coordinator = await manager.launch(
             CoordinatorAgent,
             args=(viral_handle, checkv_handle, cluster_handle, blast_handle, config_path, shutdown_event)

@@ -1,0 +1,30 @@
+Traceback (most recent call last):
+  File "/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/viral_detection_parsl.py", line 669, in <module>
+    main()
+    ~~~~^^
+  File "/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/viral_detection_parsl.py", line 655, in main
+    hits_file = run_launch_blast(work_dir, db_name, split_size, results_dir, files_list_path, query_dir, db_dir, blast_results_dir, blast_type, eval_param, out_fmt, max_target_seqs, merge_results_dir)
+  File "/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/viral_detection_parsl.py", line 361, in run_launch_blast
+    split_dir, file_name = fa_split_future.result()
+                           ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/concurrent/futures/_base.py", line 451, in result
+    self._condition.wait(timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/threading.py", line 359, in wait
+    waiter.acquire()
+    ~~~~~~~~~~~~~~^^
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/xdisk/bhurwitz/miniconda3/bin/interchange.py", line 628, in <module>
+    ic.start()
+    ~~~~~~~~^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/parsl/process_loggers.py", line 26, in wrapped
+    r = func(*args, **kwargs)
+  File "/xdisk/bhurwitz/miniconda3/bin/interchange.py", line 312, in start
+    self.socks = dict(poller.poll(timeout=poll_period))
+                      ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/xdisk/bhurwitz/miniconda3/lib/python3.13/site-packages/zmq/sugar/poll.py", line 106, in poll
+    return zmq_poll(self.sockets, timeout=timeout)
+  File "zmq/backend/cython/_zmq.py", line 1665, in zmq.backend.cython._zmq.zmq_poll
+  File "zmq/backend/cython/_zmq.py", line 176, in zmq.backend.cython._zmq._check_rc
+KeyboardInterrupt

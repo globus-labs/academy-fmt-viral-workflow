@@ -10,16 +10,6 @@ from parsl.executors.threads import ThreadPoolExecutor
 
 
 print(parsl.__version__)
-'''
-local_threads = Config(
-    executors=[
-        ThreadPoolExecutor(
-            max_threads=16,
-            label='local_threads'
-        )
-    ]
-)
-'''
 
 from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
@@ -41,12 +31,12 @@ HTEX = Config(
                     init_blocks=1,
                     mem_per_node=80,
                     cores_per_node=94,
-                    nodes_per_block=2,
+                    nodes_per_block=6,
                     scheduler_options='',
                     cmd_timeout=60,
                     walltime='24:00:00',
                     launcher=SrunLauncher(),
-                    worker_init='export OMP_NUM_THREADS=',
+                    worker_init='export OMP_NUM_THREADS=1',
                ),
           )
      ],
@@ -130,7 +120,7 @@ def run_genomad(unzipped_spades,genomad_output_dir,db):
 
     start_time = datetime.now()
     start_msg = f"[run_genomad] GeNomad Start time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-    with open("/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/parsl.out", "a") as f:
+    with open("/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/parsl4.out", "a") as f:
         f.write(start_msg) 
    
     if not unzipped_spades or not os.path.exists(unzipped_spades):
@@ -591,7 +581,7 @@ def main():
         unzipped_spades = unzip_fasta(spades_gz, unzipped_spades_path)
 
         # === Define variables for Genomad ===
-        genomad_output_dir = os.path.join(config['OUT_GENOMAD_PARSL'], sample_id)
+        genomad_output_dir = os.path.join(config['OUT_GENOMAD_PARSL4'], sample_id)
         db = config["GENOMAD_DB"]
         # === Run Genomad ===
         genomad_virus = run_genomad(unzipped_spades,genomad_output_dir,db)

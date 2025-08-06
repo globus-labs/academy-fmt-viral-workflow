@@ -9,29 +9,23 @@ export XFILE_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses
 export SPADES_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/out_spades
 
 # variables used for 3 viromics tools as well as checkv 
-export OUT_VIRSORT=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/01A_virsorter2
+export OUT_VIRSORT=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/01A_virsorter2
 export CHECKVDB=/xdisk/bhurwitz/databases/checkv-db-v1.5  
-export OUT_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/02A_dvf
+export OUT_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/02A_dvf
 export DVF_DB=/xdisk/bhurwitz/databases/DeepVirFinder
-export OUT_CHECKV_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/02B_checkv_dvf
-export OUT_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03A_genomad
-export OUT_GENOMAD_PARSL=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl
-export OUT_GENOMAD_PARSL1=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl1
-export OUT_GENOMAD_PARSL2=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl2
-export OUT_GENOMAD_PARSL3=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl3
-export OUT_GENOMAD_PARSL4=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl4
-export OUT_GENOMAD_PARSL5=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl5
-export OUT_GENOMAD_PARSL6=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl6
+export OUT_CHECKV_DVF=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/02B_checkv_dvf
+export OUT_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/03A_genomad
+export OUT_GENOMAD_PARSL=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/genomad_parsl
 export GENOMAD_DB=/xdisk/bhurwitz/databases/genomad_db          
-export OUT_CHECKV_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03B_checkv_genomad
-export OUT_CHECKV=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/checkv
+export OUT_CHECKV_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/03B_checkv_genomad
+export OUT_CHECKV=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/checkv
 export CHECKV_PARSER=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/run_scripts/CheckV_parser.R 
 export PARSE_LENGTH=5000
 #export RSCRIPT_DIR=/groups/bhurwitz/miniconda3/bin/Rscript  '''redownload'''
 
 # dereplication and clustering 
-export OUT_DEREP=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/04A_dereplicate
-export OUT_CLUSTER=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/04B_cluster
+export OUT_DEREP=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/04A_dereplicate
+export OUT_CLUSTER=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/agentic_testing/04B_cluster
 
 # step 1 create blastdb
 export DB_DIR=/xdisk/bhurwitz/databases/AVrC    
