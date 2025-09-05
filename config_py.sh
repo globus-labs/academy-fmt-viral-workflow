@@ -5,6 +5,7 @@ export LOG_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detect
 
 # defining input from assembly 
 export XFILE=xac
+export XFILE2=xad
 export XFILE_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses
 export SPADES_DIR=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/out_spades
 
@@ -19,9 +20,6 @@ export OUT_GENOMAD_PARSL=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/vi
 export OUT_GENOMAD_PARSL1=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl1
 export OUT_GENOMAD_PARSL2=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl2
 export OUT_GENOMAD_PARSL3=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl3
-export OUT_GENOMAD_PARSL4=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl4
-export OUT_GENOMAD_PARSL5=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl5
-export OUT_GENOMAD_PARSL6=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/genomad_parsl6
 export GENOMAD_DB=/xdisk/bhurwitz/databases/genomad_db          
 export OUT_CHECKV_GENOMAD=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/03B_checkv_genomad
 export OUT_CHECKV=/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/results_testing/checkv

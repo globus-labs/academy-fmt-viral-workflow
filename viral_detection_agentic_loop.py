@@ -25,15 +25,15 @@ viral_config = Config(
           HighThroughputExecutor(
                label="Parsl_htex",
                worker_debug=False,
-               cores_per_worker=4.0,
-               max_workers_per_node=23,
+               cores_per_worker=1.0,
+               max_workers_per_node=94,
                provider=SlurmProvider(
-                    partition='standard',
-                    account='bhurwitz',
+                    partition='windfall',
+                    #account='bhurwitz',
                     init_blocks=1,
                     mem_per_node=80,
-                    cores_per_node=92,
-                    nodes_per_block=4,
+                    cores_per_node=94,
+                    nodes_per_block=7,
                     scheduler_options='',
                     cmd_timeout=60,
                     walltime='40:00:00',
@@ -53,12 +53,12 @@ checkv_config = Config(
                cores_per_worker=1.0,
                max_workers_per_node=94,
                provider=SlurmProvider(
-                    partition='standard',
-                    account='bhurwitz',
+                    partition='windfall',
+                    #account='bhurwitz',
                     init_blocks=1,
                     mem_per_node=80,
                     cores_per_node=94,
-                    nodes_per_block=1,
+                    nodes_per_block=7,
                     scheduler_options='',
                     cmd_timeout=60,
                     walltime='40:00:00',
@@ -78,12 +78,12 @@ derep_cluster_config = Config(
                cores_per_worker=1.0,
                max_workers_per_node=94,
                provider=SlurmProvider(
-                    partition='standard',
-                    account='bhurwitz',
+                    partition='windfall',
+                    #account='bhurwitz',
                     init_blocks=1,
                     mem_per_node=80,
                     cores_per_node=94,
-                    nodes_per_block=1,
+                    nodes_per_block=7,
                     scheduler_options='',
                     cmd_timeout=60,
                     walltime='40:00:00',
@@ -103,12 +103,12 @@ blast_config = Config(
                cores_per_worker=1.0,
                max_workers_per_node=94,
                provider=SlurmProvider(
-                    partition='standard',
-                    account='bhurwitz',
+                    partition='windfall',
+                    #account='bhurwitz',
                     init_blocks=1,
                     mem_per_node=80,
                     cores_per_node=94,
-                    nodes_per_block=1,
+                    nodes_per_block=7,
                     scheduler_options='',
                     cmd_timeout=60,
                     walltime='40:00:00',
@@ -182,7 +182,11 @@ def virsorter_app(unzipped_spades, virsorter_output_dir):
     import subprocess
     import os
     import socket
+    import shutil
     print("VirSorter Running on node:", socket.gethostname(), flush=True)
+    if os.path.exists(virsorter_output_dir):
+        shutil.rmtree(virsorter_output_dir)
+    os.makedirs(virsorter_output_dir)   
     cmd = [
         "conda", "run", "-n", "virsorter2_env",
         "virsorter", "run", "-w", virsorter_output_dir,
@@ -515,16 +519,18 @@ def make_blast_db_app(db_dir: str, max_db_size: int, db_list_path: str):
             for file in files:
                 if file.endswith(".fasta"):
                     rel_path = os.path.join(root, file).lstrip("./")
-                    db_list.write(rel_path + "\n")
+                    rel_path_no_ext = os.path.splitext(rel_path)[0]
+                    db_list.write(rel_path_no_ext + "\n")
 
     if not os.path.exists(db_list_path) or os.path.getsize(db_list_path) == 0:
         raise FileNotFoundError(f"Empty or missing db list: {db_list_path}")
 
     with open(db_list_path) as f:
         for line in f:
-            db_file = line.strip()
-            db_name = os.path.splitext(os.path.basename(db_file))[0]
+            db_file_base = line.strip()
+            db_name = os.path.splitext(os.path.basename(db_file_base))[0]
             db_prefix = os.path.join(db_dir, db_name)
+            fasta_path = db_file_base + ".fasta"
 
             if all(os.path.exists(f"{db_prefix}.{ext}") for ext in ["nhr", "nin", "nsq"]):
                 continue
@@ -534,7 +540,7 @@ def make_blast_db_app(db_dir: str, max_db_size: int, db_list_path: str):
                 "makeblastdb",
                 "-title", db_name,
                 "-out", db_prefix,
-                "-in", db_file,
+                "-in", fasta_path,
                 "-dbtype", "nucl",
                 "-max_file_sz", str(max_db_size)
             ]
@@ -593,9 +599,9 @@ def merge_blast_results_app(work_dir, merge_results_dir, db_dir, file_name):
         databases = [line.strip() for line in f.readlines()]
 
     for db in databases:
-        results_by_db = os.path.join(merge_results_dir, db)
+        results_by_db = os.path.join(merge_results_dir, f"{db}.fasta")
         os.makedirs(results_by_db, exist_ok=True)
-        blast_out_dir = os.path.join(work_dir, "results", "05C_blast", db, file_name)
+        blast_out_dir = os.path.join(work_dir, "results", "05C_blast", f"{db}.fasta", file_name)
         blast_results = os.path.join(results_by_db, f"{file_name}.txt")
         blast_gff = os.path.join(results_by_db, f"{file_name}.gff")
 
@@ -882,7 +888,7 @@ async def process_sample(sample_id, config, tool, viral_handle, checkv_handle, c
                                                       dvf_output_dir, dvf_db, work_dir, script_dir))
     end_time = datetime.now()
     elapsed = end_time - start_time
-    print("{tool} started at {start_time} and ended at {end_time} - duration: {elapsed}", flush=True)    
+    print(f"{tool} started at {start_time} and ended at {end_time} - duration: {elapsed}", flush=True)    
  
     # === CheckV ===
     checkv_parser = config["CHECKV_PARSER"]

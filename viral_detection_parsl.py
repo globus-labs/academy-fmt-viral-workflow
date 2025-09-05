@@ -10,16 +10,6 @@ from parsl.executors.threads import ThreadPoolExecutor
 
 
 print(parsl.__version__)
-'''
-local_threads = Config(
-    executors=[
-        ThreadPoolExecutor(
-            max_threads=16,
-            label='local_threads'
-        )
-    ]
-)
-'''
 
 from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
@@ -36,17 +26,17 @@ HTEX = Config(
                cores_per_worker=1.0,
                max_workers_per_node=94,
                provider=SlurmProvider(
-                    partition='standard',
-                    account='bhurwitz',
+                    partition='windfall',
+                    #account='bhurwitz',
                     init_blocks=1,
                     mem_per_node=80,
                     cores_per_node=94,
-                    nodes_per_block=2,
+                    nodes_per_block=7,
                     scheduler_options='',
                     cmd_timeout=60,
                     walltime='24:00:00',
                     launcher=SrunLauncher(),
-                    worker_init='export OMP_NUM_THREADS=',
+                    worker_init='export OMP_NUM_THREADS=1',
                ),
           )
      ],
@@ -130,7 +120,7 @@ def run_genomad(unzipped_spades,genomad_output_dir,db):
 
     start_time = datetime.now()
     start_msg = f"[run_genomad] GeNomad Start time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-    with open("/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/parsl.out", "a") as f:
+    with open("/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/job_log.csv", "a") as f:
         f.write(start_msg) 
    
     if not unzipped_spades or not os.path.exists(unzipped_spades):
@@ -147,7 +137,10 @@ def run_genomad(unzipped_spades,genomad_output_dir,db):
     
     # Run the command
     subprocess.run(cmd, check=True)
-
+    end_time = datetime.now()
+    end_msg = f"[run_genomad] GeNomad End time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+    with open("/xdisk/bhurwitz/virus_hunting/kolodisner/fmt_viruses/viral_detection_pipeline/job_log.csv", "a") as f:
+        f.write(end_msg)  
     genomad_virus = os.path.join(genomad_output_dir, "contigs_summary", "contigs_virus.fna")
     return genomad_virus
 
@@ -307,7 +300,8 @@ def make_blast_db(db_dir, max_db_size, db_list_path):
             for file in files:
                 if file.endswith(".fasta"):
                     rel_path = os.path.join(root, file).lstrip("./")
-                    db_list.write(rel_path + "\n")
+                    rel_path_no_ext = os.path.splitext(rel_path)[0]
+                    db_list.write(rel_path_no_ext + "\n")
 
     # === Check if db-list exists and is non-empty ===
 
@@ -316,14 +310,14 @@ def make_blast_db(db_dir, max_db_size, db_list_path):
         return
 
     # === Process each FASTA file ===
-
     with open(db_list_path) as f:
         for i, line in enumerate(f, start=1):
-            db_file = line.strip()
-            db_base = os.path.splitext(db_file)[0] 
-            db_name = os.path.basename(db_base)
+            db_file_base = line.strip()
+            db_file = db_file_base + ".fasta" 
+            db_name = os.path.basename(db_file_base)
 
             print(f"{i:5d}: {db_name}")
+
 
             # Build and run makeblastdb command via apptainer
 
@@ -507,7 +501,7 @@ def merge_blast(work_dir, results_dir, db_list_path, file_name):
 
         blast_results = os.path.join(results_by_db, f"{file_name}.txt")
         blast_gff = os.path.join(results_by_db, f"{file_name}.gff")
-        blast_out = os.path.join(work_dir, "results", "05C_blast", db, file_name)
+        blast_out = os.path.join(work_dir, "results_testing", "05C_blast", f"{db}.fasta", file_name)
 
         # Merge BLAST results into a single file
         print(f"Merging BLAST results for {db}")
@@ -580,8 +574,7 @@ def main():
     config_file = File(config_path)
     config = make_config(config_file)
 
-    sample_ids_file = File(f"{config['XFILE_DIR']}/{config['XFILE']}")
-    sample_ids_file = File(os.path.join(config['XFILE_DIR'], config['XFILE']))
+    sample_ids_file = File(os.path.join(config['XFILE_DIR'], config['XFILE2']))
     sample_ids = read_sample_ids(sample_ids_file)
     
     for sample_id in sample_ids:
